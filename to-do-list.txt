@@ -1,0 +1,10 @@
+-- harus ngoding apa ini cok --
+1. cari apa yang di import kan ()
+2. connect ke database dulu ()
+3. bikin menu utama yang isinya : ()
+ - login owner/peminjam
+ - bikin akun baru buat peminjam
+ - keluar dari program
+4. bikin menu login owner ()
+5. bikin menu login dan registrasi peminjam
+6. 
