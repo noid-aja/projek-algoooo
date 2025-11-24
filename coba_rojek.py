@@ -1,7 +1,7 @@
 import psycopg2
 import pandas as pd
 import tabulate as tb
-import pyfiglet
+import pyfiglet as pf
 from colorama import init, Fore, Style
 import questionary as q
 
@@ -15,7 +15,7 @@ def connectDB():
             dbname = "ujialgo",
         )
         cur = conn.cursor()
-        print("Koneksi Berhasil")
+        # print("Koneksi Berhasil") # buat ngasi kejelasan kalo db ini serius
         return conn, cur
     except Exception as e:
         print("Koneksi gagal, coba lagi")
@@ -30,15 +30,13 @@ init(autoreset=True)
 
 # clear sistem buat gk rame dan lebih jelas
 def bersih_terminal():
-    """Clear screen yang beneran"""
     import os
     os.system('cls' if os.name == 'nt' else 'clear')
 
 # judul program
 def header():
-    """Tampilan header dengan pyfiglet"""
     bersih_terminal()
-    title = pyfiglet.figlet_format("SEWA ALAT PERTANIAN", font="slant")
+    title = pf.figlet_format("SEWA ALAT PERTANIAN", font="slant")
     print(Fore.GREEN + title)
     print(Fore.CYAN + "="*60)
     print(Fore.YELLOW + Style.BRIGHT + "   SISTEM PEMINJAMAN & PENYEWAAN ALAT PERTANIAN")
@@ -47,7 +45,6 @@ def header():
 
 # menu utama
 def menu_utama():
-    """Menu utama sistem"""
     while True:
         header()
         print(Fore.WHITE + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
@@ -72,14 +69,13 @@ def menu_utama():
         elif pilihan == "0":
             bersih_terminal()
             print(Fore.GREEN + Style.BRIGHT + "\n✨ Terima kasih telah menggunakan aplikasi kami! ✨\n")
-            break
+            return
         else:
             print(Fore.RED + "\n❌ Pilihan tidak valid! Tekan Enter untuk kembali...")
             input()
 
 # login peminjam
 def login_peminjam():
-    """Form login untuk peminjam"""
     header()
     print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "              LOGIN SEBAGAI PEMINJAM                    " + Fore.GREEN + "║")
@@ -121,7 +117,6 @@ def login_peminjam():
 
 # login owner
 def login_owner():
-    """Form login untuk owner"""
     header()
     print(Fore.YELLOW + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.YELLOW + Style.BRIGHT + "║" + Fore.WHITE + "           LOGIN SEBAGAI OWNER/PEMILIK                  " + Fore.YELLOW + "║")
@@ -133,7 +128,6 @@ def login_owner():
         password = input(Fore.CYAN + "Password: " + Fore.WHITE)
 
         print()
-        print(Fore.YELLOW + "⏳ Memproses login...")
 
         try:
             conn, cursor = connectDB()
@@ -163,7 +157,6 @@ def login_owner():
 
 # registrasi akun peminjam
 def registrasi():
-    """Form registrasi akun baru (hanya untuk peminjam)"""
     header()
     print(Fore.BLUE + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.BLUE + Style.BRIGHT + "║" + Fore.WHITE + "          REGISTRASI AKUN PEMINJAM                     " + Fore.BLUE + "║")
@@ -187,7 +180,6 @@ def registrasi():
 
 # menu peminjam
 def menu_peminjam():
-    """Menu untuk peminjam (placeholder)"""
     while True:
         header()
         print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
@@ -195,10 +187,9 @@ def menu_peminjam():
         print(Fore.GREEN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
         print()
         print(Fore.CYAN + "  [1] 🔍  Lihat Alat Tersedia")
-        print(Fore.CYAN + "  [2] 📝  Ajukan Peminjaman")
+        print(Fore.CYAN + "  [2] 📝  Ajukan Persetujuan Peminjaman") 
         print(Fore.CYAN + "  [3] 📋  Riwayat Peminjaman Saya")
-        print(Fore.CYAN + "  [4] ↩️   Kembalikan Alat")
-        print(Fore.CYAN + "  [5] 👤  Profil Saya")
+        print(Fore.CYAN + "  [4] ↩️   Kembalikan Alat") # gk tau kepake apa gk
         print(Fore.RED + "  [0] 🚪  Logout")
         print()
         print(Fore.CYAN + "─" * 60)
@@ -206,65 +197,70 @@ def menu_peminjam():
         pilihan = input(Fore.WHITE + "Pilih menu: " + Fore.YELLOW)
         
         if pilihan == "1":
-            conn, cur = connectDB()
-            if conn is None or cur is None:
-                print(Fore.RED + "\n❌ Gagal terhubung ke database.")
-                input(Fore.WHITE + "Tekan Enter untuk kembali...")
-                continue
+            lihat_alat_tersedia()
 
-            try:
-                query = "SELECT * FROM Alat_pertanian"
-                cur.execute(query)
-                rows = cur.fetchall()
-
-                # ambil nama kolom dari cursor
-                col_names = [desc[0] for desc in cur.description]
-
-                # selalu buat DataFrame dengan kolom yang sama
-                if rows:
-                    df = pd.DataFrame(rows, columns=col_names)
-                else:
-                    df = pd.DataFrame(columns=col_names)
-
-                print(Fore.CYAN + "\nDaftar Alat Pertanian:\n")
-
-                # pakai tabulate (kamu sudah import tabulate as tb)
-                print(
-                    Fore.WHITE
-                    + tb.tabulate(
-                        df,
-                        headers="keys",      # pakai nama kolom DataFrame
-                        tablefmt="fancy_grid",     # bisa ganti 'psql', 'fancy_grid', dll
-                        showindex=False
-                    )
-                )
-
-                if df.empty:
-                    print(Fore.YELLOW + "\n⚠ Belum ada data alat pertanian.")
-
-                input(Fore.WHITE + "\nTekan Enter untuk kembali...")
-
-            except Exception as e:
-                print(Fore.RED + f"\n❌ Terjadi kesalahan saat mengambil data: {e}")
-                input(Fore.WHITE + "Tekan Enter untuk kembali...")
-            finally:
-                cur.close()
-                conn.close()
         # elif pilihan == "2":
-        #     conn, cur = connectDB()
+        #     ajukan_peminjaman()
 
         elif pilihan == "0":
             print(Fore.YELLOW + "\n👋 Logout berhasil!")
             input(Fore.WHITE + "Tekan Enter untuk kembali...")
-            menu_utama()
             break
         else:
             print(Fore.YELLOW + "\n⚠️  Input tidak valid...")
             input(Fore.WHITE + "Tekan Enter untuk kembali...")
 
+# lihat alat tersedia
+def lihat_alat_tersedia():
+    print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
+    print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                  ALAT YANG TERSEDIA                         " + Fore.GREEN + "║")
+    print(Fore.GREEN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
+    print()
+    conn, cur = connectDB()
+    
+    if conn is None or cur is None:
+        print(Fore.RED + "\n❌ Gagal terhubung ke database.")
+        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+        return
+
+    try:
+        query = "SELECT * FROM Alat_pertanian"
+        cur.execute(query)
+        rows = cur.fetchall()
+
+        col_names = [desc[0] for desc in cur.description]
+        if rows:
+            df = pd.DataFrame(rows, columns=col_names)
+        else:
+            df = pd.DataFrame(columns=col_names)
+
+        print(Fore.CYAN + "\nDaftar Alat Pertanian:\n")
+        print(
+            Fore.WHITE
+            + tb.tabulate(
+                df,
+                headers="keys",
+                tablefmt="fancy_grid",
+                showindex=False
+            )
+        )
+
+        if df.empty:
+            print(Fore.YELLOW + "\n⚠ Belum ada data alat pertanian.")
+
+        input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+        menu_peminjam()
+        bersih_terminal()
+
+    except Exception as e:
+        print(Fore.RED + f"\n❌ Terjadi kesalahan saat mengambil data: {e}")
+        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+    finally:
+        cur.close()
+        conn.close()
+
 # menu owner
 def menu_owner():
-    """Menu untuk owner (placeholder)"""
     while True:
         header()
         print(Fore.YELLOW + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
@@ -273,9 +269,8 @@ def menu_owner():
         print()
         print(Fore.CYAN + "  [1] 🚜  Kelola Alat Pertanian")
         print(Fore.CYAN + "  [2] 📊  Lihat Peminjaman Aktif")
-        print(Fore.CYAN + "  [3] 💰  Laporan Pendapatan")
+        print(Fore.CYAN + "  [3] 📋  Konfirmasi Persetujuan Peminjaman")
         print(Fore.CYAN + "  [4] ✅  Konfirmasi Pengembalian")
-        print(Fore.CYAN + "  [5] 👤  Profil Saya")
         print(Fore.RED + "  [0] 🚪  Logout")
         print()
         print(Fore.CYAN + "─" * 60)
@@ -293,9 +288,9 @@ def menu_owner():
 # Jalanin Main program
 if __name__ == "__main__":
     try:
-        login_peminjam()
+        menu_utama()
     except KeyboardInterrupt:
         bersih_terminal()
         print(Fore.RED + "\n\n❌ Program dihentikan oleh user.\n")
-    except Exception as e:
-        print(Fore.RED + f"\n❌ Error: {e}\n")
+    except Exception:
+        print(Fore.RED + f"\n❌ Error: {Exception}\n")

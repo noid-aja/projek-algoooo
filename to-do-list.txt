@@ -1,10 +1,28 @@
 -- harus ngoding apa ini cok --
-1. cari apa yang di import kan ()
-2. connect ke database dulu ()
-3. bikin menu utama yang isinya : ()
- - login owner/peminjam
- - bikin akun baru buat peminjam
- - keluar dari program
-4. bikin menu login owner ()
-5. bikin menu login dan registrasi peminjam
-6. 
+1. cari apa yang di import kan (udah)
+2. connect ke database dulu (udah)
+3. bikin menu utama yang isinya : (udah)
+   - login owner/peminjam
+   - bikin akun baru buat peminjam
+   - keluar dari program
+4. bikin menu login owner (udah)
+5. bikin menu login dan registrasi peminjam (udah)
+6. bikin fungsi registrasi peminjam yang nyambung ke database (INSERT ke tabel peminjam) (belum)
+7. validasi username duplikat di registrasi ()
+8. bikin menu peminjam lengkap (80% jadi)
+9. bikin fungsi lihat alat tersedia (query SELECT dari tabel Alat_pertanian) (udah cuma perlu revisi lagi)
+10. bikin fungsi ajukan peminjaman (INSERT ke tabel peminjaman, status pending) ()
+11. bikin fungsi riwayat peminjaman (SELECT peminjaman berdasarkan username yang login) ()
+12. bikin fungsi kembalikan alat (UPDATE status peminjaman jadi "menunggu konfirmasi") ()
+13. bikin menu owner lengkap (still butuh validasi ndek fitur awal dulu)
+14. bikin fungsi CRUD alat pertanian: (had no idea this shit is goin to coding or not)
+    - tambah alat (INSERT)
+    - lihat alat (SELECT)
+    - edit alat (UPDATE)
+    - hapus alat (DELETE)
+15. bikin fungsi lihat peminjaman aktif owner (SELECT peminjaman status approved/aktif) ()
+16. bikin fungsi konfirmasi persetujuan peminjaman (UPDATE status pending jadi approved/rejected, kurangi stok) ()
+17. bikin fungsi konfirmasi pengembalian (UPDATE status jadi selesai, tambah stok kembali) ()
+18. tambahin validasi input (gk boleh kosong, format bener) ()
+19. tambahin error handling di semua fungsi database ()
+20. hitung total harga peminjaman berdasarkan durasi ()
