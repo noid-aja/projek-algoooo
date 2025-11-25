@@ -172,6 +172,8 @@ def registrasi():
     print(Fore.YELLOW + "⏳ Memproses registrasi...")
 
     # Placeholder - nanti diganti dengan insert ke database
+    # note : registrasi alamat nanti yang di isi provinsi, kabupaten, kecamatan lalu alamat
+    
     print(Fore.GREEN + "✅ Registrasi berhasil!")
     print(Fore.CYAN + "Silakan login dengan akun Anda.")
 
