@@ -51,22 +51,25 @@ def menu_utama():
         print(Fore.WHITE + Style.BRIGHT + "║" + Fore.CYAN + "                    MENU UTAMA                          " + Fore.WHITE + "║")
         print(Fore.WHITE + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
         print()
-        print(Fore.GREEN + "  [1] 👤  Login sebagai Peminjam")
-        print(Fore.YELLOW + "  [2] 🏪  Login sebagai Owner/Pemilik")
-        print(Fore.BLUE + "  [3] 📝  Registrasi Akun Peminjam")
-        print(Fore.RED + "  [0] ❌  Keluar")
+        pilihan = q.select(
+            "Pilih menu:",
+            choices=[
+                "👤  Login sebagai Peminjam",
+                "🏪  Login sebagai Owner/Pemilik",
+                "📝  Registrasi Akun Peminjam",
+                "❌  Keluar"
+            ]
+        ).ask()
         print()
         print(Fore.CYAN + "─" * 60)
-        
-        pilihan = input(Fore.WHITE + "Pilih menu: " + Fore.YELLOW)
-        
-        if pilihan == "1":
+                
+        if pilihan == "👤  Login sebagai Peminjam":
             login_peminjam()
-        elif pilihan == "2":
+        elif pilihan == "🏪  Login sebagai Owner/Pemilik":
             login_owner()
-        elif pilihan == "3":
+        elif pilihan == "📝  Registrasi Akun Peminjam":
             registrasi()
-        elif pilihan == "0":
+        elif pilihan == "❌  Keluar":
             bersih_terminal()
             print(Fore.GREEN + Style.BRIGHT + "\n✨ Terima kasih telah menggunakan aplikasi kami! ✨\n")
             return
@@ -163,22 +166,36 @@ def registrasi():
     print(Fore.BLUE + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
     print()
 
-    username = input(Fore.CYAN + "Username baru: " + Fore.WHITE)
-    password = input(Fore.CYAN + "Password: " + Fore.WHITE)
-    nama = input(Fore.CYAN + "Nama lengkap: " + Fore.WHITE)
-    no_hp = input(Fore.CYAN + "No. HP: " + Fore.WHITE)
+    while True:
+        username = input(Fore.CYAN + "Username baru: " + Fore.WHITE)
+        password = input(Fore.CYAN + "Password: " + Fore.WHITE)
+        nama = input(Fore.CYAN + "Nama lengkap: " + Fore.WHITE)
+        no_hp = input(Fore.CYAN + "No. HP: " + Fore.WHITE)
+        alamat = input(Fore.CYAN + "Alamat: " + Fore.WHITE)
+        desa = input(Fore.CYAN + "Desa: " + Fore.WHITE)
+        kecamatan = input(Fore.CYAN + "Kecamatan: " + Fore.WHITE)
 
-    print()
-    print(Fore.YELLOW + "⏳ Memproses registrasi...")
+        try:
+            conn, cursor = connectDB()
+            query = "INSERT INTO peminjam (username, password, nama, no_hp, alamat, desa, kecamatan)" + " VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(query, (username, password, nama, no_hp, alamat, desa))
+            conn.commit()
+        except Exception as e:
+            print(Fore.RED + f"\n❌ Gagal registrasi: {e}")
+            input(Fore.WHITE + "Tekan Enter untuk mencoba lagi...")
+            continue
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
 
-    # Placeholder - nanti diganti dengan insert ke database
-    # note : registrasi alamat nanti yang di isi provinsi, kabupaten, kecamatan lalu alamat
-    
-    print(Fore.GREEN + "✅ Registrasi berhasil!")
-    print(Fore.CYAN + "Silakan login dengan akun Anda.")
+        print()
+        print(Fore.YELLOW + "⏳ Memproses registrasi...")
+        print(Fore.GREEN + "✅ Registrasi berhasil!")
+        print(Fore.CYAN + "Silakan login dengan akun Anda.")
 
-    input(Fore.WHITE + "\nTekan Enter untuk kembali...")
-    menu_utama()
+        input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+        menu_utama()
 
 # menu peminjam
 def menu_peminjam():
@@ -188,23 +205,26 @@ def menu_peminjam():
         print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                  MENU PEMINJAM                         " + Fore.GREEN + "║")
         print(Fore.GREEN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
         print()
-        print(Fore.CYAN + "  [1] 🔍  Lihat Alat Tersedia")
-        print(Fore.CYAN + "  [2] 📝  Ajukan Persetujuan Peminjaman") 
-        print(Fore.CYAN + "  [3] 📋  Riwayat Peminjaman Saya")
-        print(Fore.CYAN + "  [4] ↩️   Kembalikan Alat") # gk tau kepake apa gk
-        print(Fore.RED + "  [0] 🚪  Logout")
+        pilihan = q.select(
+            "Pilih menu:",
+            choices=[
+                "🔍  Lihat Alat Tersedia",
+                "📝  Ajukan Persetujuan Peminjaman",
+                "📋  Riwayat Peminjaman Saya",
+                "↩   Kembalikan Alat",
+                "❌  Logout"
+            ]
+        ).ask()
         print()
         print(Fore.CYAN + "─" * 60)
         
-        pilihan = input(Fore.WHITE + "Pilih menu: " + Fore.YELLOW)
-        
-        if pilihan == "1":
+        if pilihan == "🔍  Lihat Alat Tersedia":
             lihat_alat_tersedia()
 
         # elif pilihan == "2":
         #     ajukan_peminjaman()
 
-        elif pilihan == "0":
+        elif pilihan == "❌  Logout":
             print(Fore.YELLOW + "\n👋 Logout berhasil!")
             input(Fore.WHITE + "Tekan Enter untuk kembali...")
             break
@@ -214,10 +234,12 @@ def menu_peminjam():
 
 # lihat alat tersedia
 def lihat_alat_tersedia():
+    header()
     print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                  ALAT YANG TERSEDIA                         " + Fore.GREEN + "║")
     print(Fore.GREEN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
     print()
+    
     conn, cur = connectDB()
     
     if conn is None or cur is None:
@@ -226,29 +248,39 @@ def lihat_alat_tersedia():
         return
 
     try:
-        query = "SELECT * FROM Alat_pertanian"
+        # Query yang lebih spesifik untuk memilih kolom yang ingin ditampilkan
+        query = """
+        SELECT 
+            idalat AS ID,
+            namaalat AS Nama_Alat,
+            hargaalat AS Harga,
+            desuripsialat AS Deskripsi,
+            diskonalat AS Diskon,
+            idkondisialat AS Kondisi
+        FROM AlatPertanian 
+        WHERE idsta = 1  -- Hanya tampilkan alat yang tersedia
+        """
         cur.execute(query)
         rows = cur.fetchall()
 
-        col_names = [desc[0] for desc in cur.description]
         if rows:
-            df = pd.DataFrame(rows, columns=col_names)
+            # Buat DataFrame dengan kolom yang spesifik
+            df = pd.DataFrame(rows, columns=['ID', 'Nama Alat', 'Harga', 'Deskripsi', 'Diskon', 'Kondisi'])
+            
+            # Format harga menjadi lebih readable
+            df['Harga'] = df['Harga'].apply(lambda x: f"Rp {x:,.0f}" if x else "Rp 0")
+            
+            # Format diskon menjadi persentase
+            df['Diskon'] = df['Diskon'].apply(lambda x: f"{x}%" if x else "0%")
+            
+            # Map kondisi ke teks yang lebih jelas
+            kondisi_map = {1: 'Baik', 2: 'Perlu Perawatan', 3: 'Rusak'}
+            df['Kondisi'] = df['Kondisi'].map(kondisi_map)
+            
+            # Tampilkan tabel dengan format yang lebih baik
+            print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="grid", showindex=False))
         else:
-            df = pd.DataFrame(columns=col_names)
-
-        print(Fore.CYAN + "\nDaftar Alat Pertanian:\n")
-        print(
-            Fore.WHITE
-            + tb.tabulate(
-                df,
-                headers="keys",
-                tablefmt="fancy_grid",
-                showindex=False
-            )
-        )
-
-        if df.empty:
-            print(Fore.YELLOW + "\n⚠ Belum ada data alat pertanian.")
+            print(Fore.YELLOW + "\n⚠ Tidak ada alat pertanian yang tersedia saat ini.")
 
         input(Fore.WHITE + "\nTekan Enter untuk kembali...")
         menu_peminjam()
@@ -258,9 +290,13 @@ def lihat_alat_tersedia():
         print(Fore.RED + f"\n❌ Terjadi kesalahan saat mengambil data: {e}")
         input(Fore.WHITE + "Tekan Enter untuk kembali...")
     finally:
-        cur.close()
-        conn.close()
-
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+# ajukan persetujuan peminjaman
+# def ajukan_peminjaman():
+    
 # menu owner
 def menu_owner():
     while True:
@@ -290,7 +326,7 @@ def menu_owner():
 # Jalanin Main program
 if __name__ == "__main__":
     try:
-        menu_utama()
+        menu_peminjam()
     except KeyboardInterrupt:
         bersih_terminal()
         print(Fore.RED + "\n\n❌ Program dihentikan oleh user.\n")
