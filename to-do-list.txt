@@ -7,7 +7,7 @@
    - keluar dari program
 4. bikin menu login owner (udah)
 5. bikin menu login dan registrasi peminjam (udah)
-6. bikin fungsi registrasi peminjam yang nyambung ke database (INSERT ke tabel peminjam) (belum)
+6. bikin fungsi registrasi peminjam yang nyambung ke database (INSERT ke tabel peminjam) (udah)
 7. validasi username duplikat di registrasi ()
 8. bikin menu peminjam lengkap (80% jadi)
 9. bikin fungsi lihat alat tersedia (query SELECT dari tabel Alat_pertanian) (udah cuma perlu revisi lagi)

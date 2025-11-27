@@ -1,0 +1,6 @@
+peminjam ngajuin ke owner :
+Peminjam Login → Lihat Alat Tersedia → Pilih Alat → 
+Isi Form Peminjaman → Simpan ke Database → 
+Status Alat: "Diajukan" → Owner Diberitahu → 
+Owner Review → Approve/Reject → Status Update
+
