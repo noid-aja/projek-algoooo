@@ -413,7 +413,8 @@ def menu_peminjam():
         pilihan = q.select(
             "Pilih menu:",
             choices=[
-                "🔍  Lihat dan Ajukan Alat Tersedia",
+                "🔍  Lihat Alat Tersedia",
+                "📮  Ajukan Alat Tersedia",
                 "📋  Riwayat Peminjaman Saya",
                 "↩   Kembalikan Alat",
                 "❌  Logout"
@@ -425,9 +426,9 @@ def menu_peminjam():
         if pilihan == "🔍  Lihat Alat Tersedia":
             lihat_alat_tersedia()
 
-        elif pilihan == "🔍  Ajukan Alat Tersedia":
+        elif pilihan == "📮  Ajukan Alat Tersedia":
             ajukan_peminjaman()
-            
+
         # elif pilihan == "📋  Riwayat Peminjaman Saya":
         #     lihat_riwayat_peminjaman()
 
