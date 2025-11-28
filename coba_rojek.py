@@ -422,9 +422,12 @@ def menu_peminjam():
         print()
         print(Fore.CYAN + "─" * 60)
         
-        if pilihan == "🔍  Lihat dan Ajukan Alat Tersedia":
+        if pilihan == "🔍  Lihat Alat Tersedia":
             lihat_alat_tersedia()
 
+        elif pilihan == "🔍  Ajukan Alat Tersedia":
+            ajukan_peminjaman()
+            
         # elif pilihan == "📋  Riwayat Peminjaman Saya":
         #     lihat_riwayat_peminjaman()
 
@@ -604,7 +607,7 @@ def kembalikan_alat():
             conn.close()
 
 # ajukan persetujuan peminjaman
-def proses_ajukan_peminjaman(cur, id_peminjam, rows):
+def ajukan_peminjaman(cur, id_peminjam, rows):
     header()
     print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                  AJUKAN PERSETUJUAN PEMINJAMAN                    " + Fore.GREEN + "║")
