@@ -5,7 +5,7 @@ import pyfiglet as pf
 from colorama import init, Fore, Style
 import questionary as q
 from datetime import date, datetime, timedelta
-
+import traceback
 
 # koneksi antar python dengan database
 def connectDB():
@@ -608,69 +608,116 @@ def kembalikan_alat():
             conn.close()
 
 # ajukan persetujuan peminjaman
-def ajukan_peminjaman(cur, id_peminjam, rows):
+def ajukan_peminjaman(conn, cur, id_peminjam, rows):
+    """
+    Fungsi untuk mengajukan peminjaman alat
+    
+    Parameters:
+    - conn: Connection object dari connectDB()
+    - cur: Cursor object dari connectDB()
+    - id_peminjam: ID peminjam yang login
+    - rows: Data alat dari query sebelumnya
+    """
     header()
     print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                  AJUKAN PERSETUJUAN PEMINJAMAN                    " + Fore.GREEN + "║")
     print(Fore.GREEN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
     print()
 
-    # pilih alat
-    df = pd.DataFrame(rows, columns=['ID', 'Nama Alat', 'Harga', 'Deskripsi', 'Diskon', 'Kondisi', 'Status Alat'])
-    print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
+    try:
+        # Validasi connection
+        if conn is None or cur is None:
+            print(Fore.RED + "\n❌ Gagal terhubung ke database.")
+            input(Fore.WHITE + "Tekan Enter untuk kembali...")
+            return None
 
-    print()
-    idalat = int(input(Fore.CYAN + "Masukkan ID alat yang ingin disewa: " + Fore.WHITE))
+        # Tampilkan daftar alat tersedia
+        df = pd.DataFrame(rows, columns=['ID', 'Nama Alat', 'Harga', 'Deskripsi', 'Diskon', 'Kondisi', 'Status Alat'])
+        print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
+        print()
 
-    # input lama peminjaman
-    lama_hari = int(input(Fore.CYAN + "Lama peminjaman (hari): " + Fore.WHITE))
-    today = date.today()
-    tenggat = today + timedelta(days=lama_hari)
+        # Input dari user
+        idalat = int(input(Fore.CYAN + "Masukkan ID alat yang ingin disewa: " + Fore.WHITE))
+        lama_hari = int(input(Fore.CYAN + "Lama peminjaman (hari): " + Fore.WHITE))
 
-    # ambil harga & diskon
-    cur.execute("SELECT hargaalat, diskonalat FROM AlatPertanian WHERE idalat = %s", (idalat,))
-    alat = cur.fetchone()
-    if not alat:
-        raise ValueError("ID alat tidak ditemukan")
+        # Hitung tanggal
+        today = date.today()
+        tenggat = today + timedelta(days=lama_hari)
 
-    harga_alat, diskon_alat = alat
-    harga_setelah_diskon = harga_alat - (diskon_alat or 0)
-    dp = int(0.2 * harga_setelah_diskon) 
+        # Ambil harga & diskon dari database
+        cur.execute("SELECT hargaalat, diskonalat FROM AlatPertanian WHERE idalat = %s", (idalat,))
+        alat = cur.fetchone()
+        
+        if not alat:
+            raise ValueError(f"❌ ID alat {idalat} tidak ditemukan")
 
-    # insert ke Peminjaman
-    insert_peminjaman = """
-        INSERT INTO Peminjaman (tanggalpeminjaman, tenggatpeminjaman, dp, deskripsi, idstatuspeminjaman)
-        VALUES ( %s, %s, %s, %s, %s)
-        RETURNING idpeminjaman;
-    """
-    deskripsi = f"Peminjaman alat ID {idalat}"
-    idstatus = 1  # Pending (sesuaikan dengan DB-mu)
+        harga_alat, diskon_alat = alat
+        harga_setelah_diskon = harga_alat - (diskon_alat or 0)
+        dp = int(0.2 * harga_setelah_diskon)  # DP 20%
 
+        # ✅ INSERT ke Peminjaman - SESUAI STRUKTUR TABEL
+        insert_peminjaman = """
+            INSERT INTO Peminjaman (
+                idpeminjam,
+                tanggalpeminjaman,
+                tenggatpeminjaman,
+                dp,
+                deskripsi,
+                idstatuspeminjaman
+            ) VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING idpeminjaman;
+        """
+        deskripsi = f"Peminjaman alat ID {idalat}"
+        idstatus = 1  # Status: Pending
 
-    cur.execute(insert_peminjaman, (id_peminjam, today, tenggat, dp, deskripsi, idstatus))
-    id_peminjaman_baru = cur.fetchone()[0]
+        cur.execute(insert_peminjaman, (id_peminjam, today, tenggat, dp, deskripsi, idstatus))
+        id_peminjaman_baru = cur.fetchone()[0]
+        print(Fore.GREEN + f"\n✅ Peminjaman dibuat dengan ID: {id_peminjaman_baru}")
 
+        insert_detail = """
+            INSERT INTO DetailPeminjaman (idpeminjaman, idalat, harga, diskon)
+            VALUES (%s, %s, %s, %s);
+        """
+        cur.execute(insert_detail, (id_peminjaman_baru, idalat, harga_alat, diskon_alat))
+        print(Fore.GREEN + "✅ Detail peminjaman ditambahkan")
 
-    # insert ke DetailPeminjaman
-    insert_detail = """
-        INSERT INTO DetailPeminjaman (idpeminjaman, idalat, harga, diskon)
-        VALUES (%s, %s, %s, %s);
-    """
-    cur.execute(insert_detail, (id_peminjaman_baru, idalat, harga_alat, diskon_alat))
+        # Update status alat → Diajukan
+        cur.execute("SELECT idstatusalat FROM StatusAlat WHERE status = 'Diajukan'")
+        row_status = cur.fetchone()
+        
+        if row_status:
+            id_status_diajukan = row_status[0]
+            cur.execute(
+                "UPDATE AlatPertanian SET idstatusalat = %s WHERE idalat = %s",
+                (id_status_diajukan, idalat)
+            )
+            print(Fore.GREEN + "✅ Status alat diubah menjadi 'Diajukan'")
+        else:
+            raise ValueError("❌ Status 'Diajukan' tidak ditemukan di database")
 
+        conn.commit()
+        print(Fore.GREEN + "\n✅✅✅ Peminjaman berhasil diajukan!")
+        print(Fore.YELLOW + f"Status: Menunggu Persetujuan Owner")
+        print(Fore.YELLOW + f"DP yang harus dibayar: RP {dp:,}")
+        input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+        return id_peminjaman_baru
 
-    # update status alat → Diajukan
-    cur.execute("SELECT idstatusalat FROM StatusAlat WHERE status = 'Diajukan'")
-    row_status = cur.fetchone()
-    if row_status:
-        id_status_diajukan = row_status[0]
-        cur.execute(
-            "UPDATE AlatPertanian SET idstatusalat = %s WHERE idalat = %s",
-            (id_status_diajukan, idalat)
-        )
-
-
-    return id_peminjaman_baru
+    except ValueError as e:
+        # Error validasi (alat tidak ditemukan, dll)
+        print(Fore.RED + f"\n❌ Error Validasi: {e}")
+        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+        return None
+    
+    except Exception as e:
+        # Error lainnya (database, dll)
+        conn.rollback()  # ✅ ROLLBACK jika error
+        print(Fore.RED + f"\n❌ Terjadi kesalahan: {type(e).__name__}")
+        print(Fore.RED + f"📝 Pesan: {e}")
+        print(Fore.RED + "\n🐛 Detail error untuk debugging:")
+        traceback.print_exc()
+        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+        return None
+        
 
 
 # menu owner
