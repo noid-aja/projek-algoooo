@@ -26,19 +26,15 @@ def connectDB():
         print("Detail error:", e)
         return None, None
 
-
 connectDB()
-
 
 # biar color berubah tanpa harus reset di setiap fungsi
 init(autoreset=True)
-
 
 # clear sistem buat gk rame dan lebih jelas
 def bersih_terminal():
     import os
     os.system('cls' if os.name == 'nt' else 'clear')
-
 
 # judul program
 def header():
@@ -49,7 +45,6 @@ def header():
     print(Fore.YELLOW + Style.BRIGHT + "   SISTEM PEMINJAMAN & PENYEWAAN ALAT PERTANIAN")
     print(Fore.CYAN + "="*60)
     print()
-
 
 # menu utama
 def menu_utama():
@@ -85,11 +80,9 @@ def menu_utama():
             print(Fore.RED + "\n❌ Pilihan tidak valid! Tekan Enter untuk kembali...")
             input()
 
-
 # login peminjam
 def login_peminjam():
     global peminjam_id
-
 
     header()
     print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
@@ -107,13 +100,10 @@ def login_peminjam():
         try:
             conn, cursor = connectDB()
 
-
             query = "SELECT * FROM peminjam WHERE username = %s AND password = %s"
             cursor.execute(query, (username, password))
 
-
             result = cursor.fetchone()
-
 
             if result:
                 peminjam_id = result[0]
@@ -123,20 +113,16 @@ def login_peminjam():
             else:
                 print(Fore.RED + "❌ Username atau password salah. Silakan coba lagi.")
 
-
         except psycopg2.Error as e:
             print(Fore.RED + f"Error database: {e}")
-
 
         finally:
             if conn:
                 cursor.close()
                 conn.close()
 
-
     input(Fore.WHITE + "\nTekan Enter untuk melanjutkan...")
     menu_peminjam()
-
 
 # login owner
 def login_owner():
@@ -153,20 +139,15 @@ def login_owner():
         username = input(Fore.CYAN + "Username: " + Fore.WHITE)
         password = input(Fore.CYAN + "Password: " + Fore.WHITE)
 
-
         print()
-
 
         try:
             conn, cursor = connectDB()
 
-
             query = "SELECT * FROM owners WHERE username = %s AND password = %s"
             cursor.execute(query, (username, password))
 
-
             result = cursor.fetchone()
-
 
             if result:
                 owner_id_skrg = result[0]
@@ -176,20 +157,16 @@ def login_owner():
             else:
                 print(Fore.RED + "❌ Username atau password salah. Silakan coba lagi.")
 
-
         except psycopg2.Error as e:
             print(Fore.RED + f"Error database: {e}")
-
 
         finally:
             if conn:
                 cursor.close()
                 conn.close()
 
-
     input(Fore.WHITE + "\nTekan Enter untuk melanjutkan...")
     menu_owner()
-
 
 # registrasi akun peminjam
 def registrasi():
@@ -205,11 +182,9 @@ def registrasi():
             username = input(Fore.CYAN + "Username baru: " + Fore.WHITE)
             password = input(Fore.CYAN + "Password     : " + Fore.WHITE)
 
-
             # NO HP: harus mulai 08, digit semua, panjang 10–13
             while True:
                 no_hp = input(Fore.CYAN + "No. HP (wajib mulai 08, 10-13 digit): " + Fore.WHITE)
-
 
                 if not no_hp.isdigit():
                     print(Fore.RED + "❌ No. HP harus angka semua!")
@@ -218,6 +193,7 @@ def registrasi():
                     header()
                     print(Fore.YELLOW + "Silakan isi ulang data (No. HP salah).")
                     print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     continue
 
 
@@ -228,6 +204,7 @@ def registrasi():
                     header()
                     print(Fore.YELLOW + "Silakan isi ulang data (No. HP salah).")
                     print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     continue
 
 
@@ -238,9 +215,9 @@ def registrasi():
                     header()
                     print(Fore.YELLOW + "Silakan isi ulang data (No. HP salah).")
                     print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     continue
                 break
-
 
             # NIK wajib 16 digit
             while True:
@@ -253,6 +230,7 @@ def registrasi():
                     print(Fore.YELLOW + "Silakan isi data lagi (NIK salah).")
                     print()
                     print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     print(Fore.WHITE + f"No. HP   : {no_hp}")
                     continue
                 if len(nik) != 16:
@@ -263,13 +241,12 @@ def registrasi():
                     print(Fore.YELLOW + "Silakan isi data lagi (NIK salah).")
                     print()
                     print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     print(Fore.WHITE + f"No. HP   : {no_hp}")
                     continue
                 break
 
-
             # Tanggal lahir wajib format YYYY-MM-DD
-
 
             while True:
                 tanggal_lahir_str = input(Fore.CYAN + "Tanggal Lahir (YYYY-MM-DD) Contoh: 2000-01-31: " + Fore.WHITE)
@@ -278,12 +255,13 @@ def registrasi():
                     break
                 except ValueError:
                     print(Fore.RED + "❌ Format tanggal salah!")
-                    input(Fore.WHITE + "Tekan Enter untuk ulang Tanggal Lahir...")
+                    input(Fore.WHITE + "Tekan Enter untuk ulangi input...")
                     bersih_terminal()
                     header()
                     print(Fore.YELLOW + "Silakan isi data lagi (Tanggal Lahir salah).")
                     print()
                     print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     print(Fore.WHITE + f"No. HP   : {no_hp}")
                     print(Fore.WHITE + f"NIK      : {nik}")
                     continue
@@ -413,8 +391,8 @@ def menu_peminjam():
         pilihan = q.select(
             "Pilih menu:",
             choices=[
-                "🔍  Lihat Alat Tersedia",
-                "📮  Ajukan Alat Tersedia",
+                # "🔍  Lihat Alat Tersedia",
+                "📮  Pinjam Alat",
                 "📋  Riwayat Peminjaman Saya",
                 "↩   Kembalikan Alat",
                 "❌  Logout"
@@ -423,14 +401,15 @@ def menu_peminjam():
         print()
         print(Fore.CYAN + "─" * 60)
         
-        if pilihan == "🔍  Lihat Alat Tersedia":
-            lihat_alat_tersedia()
+        # if pilihan == "🔍  Lihat Alat Tersedia":
+            # lihat_alat_tersedia()
 
-        elif pilihan == "📮  Ajukan Alat Tersedia":
-            ajukan_peminjaman()
+        if pilihan == "📮  Pinjam Alat":
+            conn, cur = connectDB()
+            ajukan_peminjaman_alat(conn, cur, peminjam_id, [])
 
-        # elif pilihan == "📋  Riwayat Peminjaman Saya":
-        #     lihat_riwayat_peminjaman()
+        elif pilihan == "📋  Riwayat Peminjaman Saya":
+            lihat_riwayat_peminjaman()
 
         elif pilihan == "↩   Kembalikan Alat":
             kembalikan_alat()
@@ -445,10 +424,10 @@ def menu_peminjam():
 
 
 # lihat alat tersedia
-def lihat_alat_tersedia():
+def ajukan_peminjaman_alat(conn, cur, id_peminjam, rows):
     header()
     print(Fore.GREEN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
-    print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                  ALAT YANG TERSEDIA                    " + Fore.GREEN + "║")
+    print(Fore.GREEN + Style.BRIGHT + "║" + Fore.WHITE + "                 PINJAM ALAT                     " + Fore.GREEN + "║")
     print(Fore.GREEN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
     print()
     
@@ -484,25 +463,148 @@ def lihat_alat_tersedia():
             
             # Tampilkan tabel dengan format yang lebih baik
             print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
+            print()
+
+            # Input dari user
+            idalat = int(input(Fore.CYAN + "Masukkan ID alat yang ingin disewa: " + Fore.WHITE))
+            lama_hari = int(input(Fore.CYAN + "Lama peminjaman (hari): " + Fore.WHITE))
+
+            # Hitung tanggal
+            today = date.today()
+            tenggat = today + timedelta(days=lama_hari)
+
+            # Ambil harga & diskon dari database
+            cur.execute("SELECT hargaalat, diskonalat FROM AlatPertanian WHERE idalat = %s", (idalat,))
+            alat = cur.fetchone()
             
+            if not alat:
+                raise ValueError(f"❌ ID alat {idalat} tidak ditemukan")
+
+            harga_alat, diskon_alat = alat
+            harga_setelah_diskon = harga_alat - (diskon_alat or 0)
+            dp = int(0.2 * harga_setelah_diskon)  # DP 20%
+
+            # ✅ INSERT ke Peminjaman - SESUAI STRUKTUR TABEL
+            insert_peminjaman = """
+                INSERT INTO Peminjaman (
+                    idpeminjam,
+                    tanggalpeminjaman,
+                    tenggatpeminjaman,
+                    dp,
+                    deskripsi,
+                    idstatuspeminjaman
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING idpeminjaman;
+            """
+            deskripsi = f"Peminjaman alat ID {idalat}"
+            idstatus = 1  # Status: Pending
+
+            cur.execute(insert_peminjaman, (id_peminjam, today, tenggat, dp, deskripsi, idstatus))
+            id_peminjaman_baru = cur.fetchone()[0]
+            print(Fore.GREEN + f"\n✅ Peminjaman dibuat dengan ID: {id_peminjaman_baru}")
+
+            insert_detail = """
+                INSERT INTO DetailPeminjaman (idpeminjaman, idalat, harga, diskon)
+                VALUES (%s, %s, %s, %s);
+            """
+            cur.execute(insert_detail, (id_peminjaman_baru, idalat, harga_alat, diskon_alat))
+            print(Fore.GREEN + "✅ Detail peminjaman ditambahkan")
+
+            conn.commit()
+            print(Fore.GREEN + "\n✅✅✅ Peminjaman berhasil diajukan!")
+            print(Fore.YELLOW + f"Status Peminjaman: Pending (Menunggu Persetujuan Owner)")
+            print(Fore.YELLOW + f"DP yang harus dibayar: RP {dp:,}")
+            input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+            return id_peminjaman_baru
         else:
             print(Fore.YELLOW + "\n⚠ Tidak ada alat pertanian yang tersedia saat ini.")
+            input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+            return None
+                
+    except ValueError as e:
+        # Error validasi (alat tidak ditemukan, dll)
+        print(Fore.RED + f"\n❌ Error Validasi: {e}")
+        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+        return None
+        
+    except Exception as e:
+        # Error lainnya (database, dll)
+        conn.rollback()  # ✅ ROLLBACK jika error
+        print(Fore.RED + f"\n❌ Terjadi kesalahan: {type(e).__name__}")
+        print(Fore.RED + f"📝 Pesan: {e}")
+        print(Fore.RED + "\n🐛 Detail error untuk debugging:")
+        traceback.print_exc()
+        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+        return None
 
+
+def lihat_riwayat_peminjaman():
+    global peminjam_id
+    header()
+    print(Fore.CYAN + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
+    print(Fore.CYAN + Style.BRIGHT + "║" + Fore.WHITE + "             RIWAYAT PEMINJAMAN SAYA                    " + Fore.CYAN + "║")
+    print(Fore.CYAN + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
+    print()
+
+    try:
+        conn, cur = connectDB()
+        if conn is None:
+            print(Fore.RED + "❌ Gagal terhubung ke database")
+            input()
+            return
+
+        # Query history peminjaman (semua status, bukan hanya yang selesai)
+        query = """
+        SELECT 
+            p.idpeminjaman,
+            a.namaalat as Nama_Alat,
+            'RP ' || dp.harga::TEXT as Harga_Satuan,
+            'RP ' || dp.diskon::TEXT as Diskon,
+            p.tanggalpeminjaman as Tgl_Pinjam,
+            p.tenggatpeminjaman as Tgl_Tenggat,
+            sp.statuspeminjaman as Status,
+            COALESCE(pr.tanggalpengembalian::TEXT, '-') as Tgl_Kembali
+        FROM Peminjaman p
+        JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
+        JOIN AlatPertanian a ON dp.idalat = a.idalat
+        JOIN StatusPeminjaman sp ON p.idstatuspeminjaman = sp.idstatuspeminjaman
+        LEFT JOIN Pengembalian pr ON p.idpeminjaman = pr.idpeminjaman
+        WHERE p.idpeminjam = %s
+        ORDER BY p.idpeminjaman DESC
+        """
+        cur.execute(query, (peminjam_id,))
+        rows = cur.fetchall()
+
+        if not rows:
+            print(Fore.YELLOW + "⚠️ Anda belum memiliki riwayat peminjaman.")
+            input(Fore.WHITE + "Tekan Enter untuk kembali...")
+            return
+        
+        df = pd.DataFrame(rows, columns=['ID Peminjaman', 'Nama Alat', 'Harga', 'Diskon', 'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali'])
+        print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
+        print()
+        
+        # Statistik
+        total_peminjaman = len(rows)
+        selesai = sum(1 for row in rows if row[6] == 'Dikembalikan')
+        pending = sum(1 for row in rows if row[6] == 'Pending')
+        disetujui = sum(1 for row in rows if row[6] == 'Disetujui')
+        
+        print(Fore.YELLOW + f"\n📊 Statistik:")
+        print(Fore.WHITE + f"   Total Peminjaman: {total_peminjaman}")
+        print(Fore.GREEN + f"   ✅ Selesai (Dikembalikan): {selesai}")
+        print(Fore.YELLOW + f"   ⏳ Disetujui: {disetujui}")
+        print(Fore.CYAN + f"   ⏰ Pending: {pending}")
+        
         input(Fore.WHITE + "\nTekan Enter untuk kembali...")
-        menu_peminjam()
-        bersih_terminal()
 
     except Exception as e:
-        print(Fore.RED + f"\n❌ Terjadi kesalahan saat mengambil data: {e}")
-        input(Fore.WHITE + "Tekan Enter untuk kembali...")
+        print(Fore.RED + f"❌ Error: {e}")
+        input()
     finally:
-        if cur:
-            cur.close()
         if conn:
+            cur.close()
             conn.close()
-
-# def lihat_riwayat_peminjaman():
-#     print("Fungsi lihat riwayat peminjaman belum diimplementasikan.")
 
 def kembalikan_alat():
     global peminjam_id
@@ -681,20 +783,6 @@ def ajukan_peminjaman(conn, cur, id_peminjam, rows):
         cur.execute(insert_detail, (id_peminjaman_baru, idalat, harga_alat, diskon_alat))
         print(Fore.GREEN + "✅ Detail peminjaman ditambahkan")
 
-        # Update status alat → Diajukan
-        cur.execute("SELECT idstatusalat FROM StatusAlat WHERE status = 'Diajukan'")
-        row_status = cur.fetchone()
-        
-        if row_status:
-            id_status_diajukan = row_status[0]
-            cur.execute(
-                "UPDATE AlatPertanian SET idstatusalat = %s WHERE idalat = %s",
-                (id_status_diajukan, idalat)
-            )
-            print(Fore.GREEN + "✅ Status alat diubah menjadi 'Diajukan'")
-        else:
-            raise ValueError("❌ Status 'Diajukan' tidak ditemukan di database")
-
         conn.commit()
         print(Fore.GREEN + "\n✅✅✅ Peminjaman berhasil diajukan!")
         print(Fore.YELLOW + f"Status: Menunggu Persetujuan Owner")
@@ -723,7 +811,6 @@ def ajukan_peminjaman(conn, cur, id_peminjam, rows):
 # menu owner
 def menu_owner():
     global owner_id_skrg
-
     while True:
         header()
         print(Fore.YELLOW + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
@@ -737,6 +824,7 @@ def menu_owner():
                         "📊  Lihat Peminjaman Aktif",
                         "📋  Konfirmasi Persetujuan Peminjaman",
                         "✅  Konfirmasi Pengembalian",
+                        "📜  Riwayat Peminjaman",
                         "❌  Logout"
                     ]
                 ).ask()
@@ -754,6 +842,9 @@ def menu_owner():
 
         elif pilihan == "✅  Konfirmasi Pengembalian":
             konfirmasi_pengembalian()
+        
+        elif pilihan == "📜  Riwayat Peminjaman":
+            lihat_riwayat_peminjaman_owner()
             
         elif pilihan == "❌  Logout":
             print(Fore.YELLOW + "\n👋 Logout berhasil!")
@@ -797,23 +888,47 @@ def kelola_alat_pertanian():
         try:
             # 1. TAMBAH ALAT
             if pilihan == "➕ Tambah alat pertanian":
-                nama = input("Nama alat: ")
-                harga = int(input("Harga alat: "))
-                desk = input("Deskripsi: ")
-                diskon = int(input("Diskon: "))
-                kondisi = int(input("ID Kondisi (1=Sangat baik, 2=Cukup): "))
+                try:
+                    nama = q.text("Nama alat (ESC untuk batal): ").ask()
+                    if nama is None:  # ESC ditekan
+                        print(Fore.YELLOW + "⬅️ Dibatalkan\n")
+                        continue
+                    
+                    harga_str = q.text("Harga alat (ESC untuk batal): ").ask()
+                    if harga_str is None:  # ESC ditekan
+                        print(Fore.YELLOW + "⬅️ Dibatalkan\n")
+                        continue
+                    harga = int(harga_str)
+                    
+                    desk = q.text("Deskripsi (ESC untuk batal): ").ask()
+                    if desk is None:  # ESC ditekan
+                        print(Fore.YELLOW + "⬅️ Dibatalkan\n")
+                        continue
+                    
+                    diskon_str = q.text("Diskon (ESC untuk batal): ").ask()
+                    if diskon_str is None:  # ESC ditekan
+                        print(Fore.YELLOW + "⬅️ Dibatalkan\n")
+                        continue
+                    diskon = int(diskon_str)
+                    
+                    kondisi_str = q.text("ID Kondisi 1=Sangat baik, 2=Cukup (ESC untuk batal): ").ask()
+                    if kondisi_str is None:  # ESC ditekan
+                        print(Fore.YELLOW + "⬅️ Dibatalkan\n")
+                        continue
+                    kondisi = int(kondisi_str)
 
+                    cur.execute("""
+                        INSERT INTO AlatPertanian
+                        (namaalat, hargaalat, deskripsialat, diskonalat, idowner, idstatusalat, idkondisialat)
+                        VALUES (%s, %s, %s, %s, %s, 1, %s)
+                    """, (nama, harga, desk, diskon, owner_id_skrg, kondisi))
+                    conn.commit()
 
-                cur.execute("""
-                    INSERT INTO AlatPertanian
-                    (namaalat, hargaalat, deskripsialat, diskonalat, idowner, idstatusalat, idkondisialat)
-                    VALUES (%s, %s, %s, %s, %s, 1, %s)
-                """, (nama, harga, desk, diskon, owner_id_skrg, kondisi))
-                conn.commit()
-
-
-                print(Fore.GREEN + "\n✔ Alat berhasil ditambahkan!")
-                input("Tekan Enter untuk lanjut...")
+                    print(Fore.GREEN + "\n✔ Alat berhasil ditambahkan!")
+                    input("Tekan Enter untuk lanjut...")
+                except ValueError:
+                    print(Fore.RED + "❌ Input tidak valid (harus angka untuk harga/diskon/kondisi)!")
+                    input("Tekan Enter untuk lanjut...")
 
             # 2. UBAH STATUS ALAT
             elif pilihan == "📊 Ubah status alat":
@@ -1135,14 +1250,116 @@ def konfirmasi_persetujuan_peminjaman():
             "UPDATE Peminjaman SET idstatuspeminjaman = 2 WHERE idpeminjaman = %s",
             (idpeminjaman,)
         )
+        
+        # Update status alat menjadi 'Tidak Tersedia' atau 'Dipinjam'
+        cur.execute(
+            """
+            SELECT DISTINCT dp.idalat FROM DetailPeminjaman dp
+            WHERE dp.idpeminjaman = %s
+            """,
+            (idpeminjaman,)
+        )
+        alat_list = cur.fetchall()
+        
+        # Cari atau buat status 'Tidak Tersedia' untuk alat yang dipinjam
+        cur.execute("SELECT idstatusalat FROM StatusAlat WHERE status = 'Tidak Tersedia'")
+        status_row = cur.fetchone()
+        
+        if status_row:
+            id_status_tidak_tersedia = status_row[0]
+        else:
+            cur.execute("INSERT INTO StatusAlat (status) VALUES ('Tidak Tersedia') RETURNING idstatusalat")
+            id_status_tidak_tersedia = cur.fetchone()[0]
+        
+        # Update status setiap alat
+        for alat in alat_list:
+            idalat = alat[0]
+            cur.execute(
+                "UPDATE AlatPertanian SET idstatusalat = %s WHERE idalat = %s",
+                (id_status_tidak_tersedia, idalat)
+            )
+        
         conn.commit()
         
         header()
         print(Fore.GREEN + "✅ Peminjaman telah dikonfirmasi!")
+        print(Fore.GREEN + "✅ Status alat diubah menjadi 'Tidak Tersedia'")
         input(Fore.WHITE + "Tekan Enter untuk melanjutkan...")
 
     except Exception as e:
         print(Fore.RED + f"❌ Error: {e}")
+        input()
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+def lihat_riwayat_peminjaman_owner():
+    global owner_id_skrg
+    header()
+    print(Fore.MAGENTA + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
+    print(Fore.MAGENTA + Style.BRIGHT + "║" + Fore.WHITE + "        RIWAYAT PEMINJAMAN ALAT SAYA (OWNER)             " + Fore.MAGENTA + "║")
+    print(Fore.MAGENTA + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
+    print()
+
+    try:
+        conn, cur = connectDB()
+        if conn is None:
+            print(Fore.RED + "❌ Gagal terhubung ke database")
+            input()
+            return
+
+        # Query riwayat peminjaman untuk alat milik owner ini
+        query = """
+        SELECT 
+            p.idpeminjaman,
+            pm.username as Peminjam,
+            a.namaalat as Nama_Alat,
+            'RP ' || dp.harga::TEXT as Harga,
+            p.tanggalpeminjaman as Tgl_Pinjam,
+            p.tenggatpeminjaman as Tgl_Tenggat,
+            sp.statuspeminjaman as Status_Peminjaman,
+            COALESCE(pr.tanggalpengembalian::TEXT, '-') as Tgl_Kembali
+        FROM Peminjaman p
+        JOIN Peminjam pm ON p.idpeminjam = pm.idpeminjam
+        JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
+        JOIN AlatPertanian a ON dp.idalat = a.idalat
+        JOIN StatusPeminjaman sp ON p.idstatuspeminjaman = sp.idstatuspeminjaman
+        LEFT JOIN Pengembalian pr ON p.idpeminjaman = pr.idpeminjaman
+        WHERE a.idowner = %s
+        ORDER BY p.idpeminjaman DESC
+        """
+        cur.execute(query, (owner_id_skrg,))
+        rows = cur.fetchall()
+
+        if not rows:
+            print(Fore.YELLOW + "⚠️ Tidak ada riwayat peminjaman untuk alat Anda.")
+            input(Fore.WHITE + "Tekan Enter untuk kembali...")
+            return
+        
+        df = pd.DataFrame(rows, columns=['ID Peminjaman', 'Peminjam', 'Nama Alat', 'Harga', 'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali'])
+        print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
+        print()
+        
+        # Statistik
+        total_peminjaman = len(rows)
+        selesai = sum(1 for row in rows if row[6] == 'Dikembalikan')
+        pending = sum(1 for row in rows if row[6] == 'Pending')
+        disetujui = sum(1 for row in rows if row[6] == 'Disetujui')
+        ditolak = sum(1 for row in rows if row[6] == 'Ditolak')
+        
+        print(Fore.YELLOW + f"\n📊 Statistik:")
+        print(Fore.WHITE + f"   Total Peminjaman: {total_peminjaman}")
+        print(Fore.GREEN + f"   ✅ Selesai (Dikembalikan): {selesai}")
+        print(Fore.YELLOW + f"   ⏳ Disetujui: {disetujui}")
+        print(Fore.CYAN + f"   ⏰ Pending: {pending}")
+        print(Fore.RED + f"   ❌ Ditolak: {ditolak}")
+        
+        input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+
+    except Exception as e:
+        print(Fore.RED + f"❌ Error: {e}")
+        traceback.print_exc()
         input()
     finally:
         if conn:
