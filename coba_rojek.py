@@ -484,7 +484,7 @@ def ajukan_peminjaman_alat(conn, cur, id_peminjam, rows):
         FROM AlatPertanian a
         JOIN KondisiAlat k USING (idkondisialat)
         JOIN StatusAlat s USING (idstatusalat)
-        WHERE s.status = 'Tersedia'
+        WHERE s.status = 'Tersedia' AND k.kondisi = 'Baik'
         """
         cur.execute(query)
         rows = cur.fetchall()
