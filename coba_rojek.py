@@ -475,21 +475,24 @@ def ajukan_peminjaman_alat(conn, cur, id_peminjam, rows):
     try:
         query = """
         SELECT
-            a.idalat AS ID, a.namaalat AS Nama_Alat,
+            a.idalat AS ID, 
+            a.namaalat AS Nama_Alat,
             'RP. ' || a.hargaalat AS Harga,
             a.deskripsialat AS Deskripsi,
             'Rp. ' || a.diskonalat AS Diskon,
+            o.username AS Pemilik_Alat,
             k.kondisi AS Nama_Kondisi,
             s.status AS Status_Alat
         FROM AlatPertanian a
-        JOIN KondisiAlat k USING (idkondisialat)
-        JOIN StatusAlat s USING (idstatusalat)
+        JOIN Owners o ON a.idowner = o.idowners
+        JOIN KondisiAlat k ON a.idkondisialat = k.idkondisialat
+        JOIN StatusAlat s ON a.idstatusalat = s.idstatusalat
         WHERE s.status = 'Tersedia' AND k.kondisi = 'Baik'
         """
         cur.execute(query)
         rows = cur.fetchall()
         if rows:
-            df = pd.DataFrame(rows, columns=['ID', 'Nama Alat', 'Harga', 'Deskripsi', 'Diskon', 'Kondisi', 'Status Alat'])
+            df = pd.DataFrame(rows, columns=['ID', 'Nama Alat', 'Harga', 'Deskripsi', 'Diskon', 'Pemilik', 'Kondisi', 'Status Alat'])
             print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
             print()
             idalat_str = q.text("Masukkan ID alat (ctrl+c untuk batal): ").ask()
