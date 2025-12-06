@@ -504,6 +504,23 @@ def ajukan_peminjaman_alat(conn, cur, id_peminjam, rows):
             lama_hari = int(lama_hari_str)
             today = date.today()
             tenggat = today + timedelta(days=lama_hari)
+            #Tambahan biar klo peminajam ngajuin peminjaman yang udh diajuin bakal g bisa y gitulah
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM DetailPeminjaman dp
+                JOIN Peminjaman p ON dp.idpeminjaman = p.idpeminjaman
+                WHERE dp.idalat = %s AND p.idpeminjam = %s 
+                AND p.idstatuspeminjaman IN (1,2)
+            """, (idalat, id_peminjam))
+
+            sudah_ada = cur.fetchone()[0]
+
+            if sudah_ada > 0:
+                print(Fore.RED + "\n❌ Anda sudah mengajukan atau sedang meminjam alat ini!")
+                print(Fore.YELLOW + "Selesaikan peminjaman lama sebelum meminjam lagi.")
+                input("Enter...")
+                return None
+
             cur.execute("SELECT hargaalat, diskonalat FROM AlatPertanian WHERE idalat = %s", (idalat,))
             alat = cur.fetchone()
             if not alat:
@@ -533,6 +550,12 @@ def ajukan_peminjaman_alat(conn, cur, id_peminjam, rows):
             """
             cur.execute(insert_detail, (id_peminjaman_baru, idalat, harga_alat, diskon_alat))
             print(Fore.GREEN + "✅ Detail peminjaman ditambahkan")
+            cur.execute("""
+                UPDATE AlatPertanian
+                SET idstatusalat = 3
+                WHERE idalat = %s
+            """, (idalat,))
+            print(Fore.YELLOW + "🔄 Status alat berubah menjadi 'pending'")
             conn.commit()
             print(Fore.GREEN + "\n✅✅✅ Peminjaman berhasil diajukan!")
             print(Fore.YELLOW + f"Status Peminjaman: Pending (Menunggu Persetujuan Owner)")
@@ -885,6 +908,21 @@ def kelola_alat_pertanian():
                     continue
 
                 idalat = int(idalat_str)
+                #tambahan klo alat masih dipinjem belum bisa diubah status nya
+                cur.execute("""
+                    SELECT COUNT(*)
+                    FROM DetailPeminjaman dp
+                    JOIN Peminjaman p ON dp.idpeminjaman = p.idpeminjaman
+                    WHERE dp.idalat = %s AND p.idstatuspeminjaman IN (1,2)
+                """, (idalat,))
+                masih_dipinjam = cur.fetchone()[0]
+
+                if masih_dipinjam > 0:
+                    print(Fore.RED + "\n❌ Alat ini masih dalam proses peminjaman atau sedang dipakai!")
+                    print(Fore.YELLOW + "Status hanya bisa diubah setelah alat dikembalikan.")
+                    input("Enter...")
+                    continue
+
                 print("\nStatus Baru:")
                 print("1 = Tersedia")
                 print("2 = Dipesan")
@@ -1068,13 +1106,14 @@ def konfirmasi_persetujuan_peminjaman():
             print(Fore.RED + "❌ Gagal terhubung ke database")
             input()
             return
+        
         query = """
         SELECT
             p.idpeminjaman,
-            pm.username as peminjam,
-            COUNT(dp.idalat) as jumlah_alat,
-            'RP ' || SUM(dp.harga)::TEXT as total_harga,
-            'RP ' || p.dp::TEXT as dp,
+            pm.username AS peminjam,
+            COUNT(dp.idalat) AS jumlah_alat,
+            'RP ' || SUM(dp.harga)::TEXT AS total_harga,
+            'RP ' || p.dp::TEXT AS dp,
             p.tenggatpeminjaman
         FROM Peminjaman p
         JOIN Peminjam pm ON p.idpeminjam = pm.idpeminjam
@@ -1099,48 +1138,68 @@ def konfirmasi_persetujuan_peminjaman():
             print()
             id_input = q.text("Masukkan ID peminjaman (ctrl+c untuk batal): ").ask()
             if id_input is None:
-                print(Fore.YELLOW + "\n⬅️ Dibatalkan")
+                print(Fore.YELLOW + "⬅️ Dibatalkan")
                 return
+
             if not id_input.isdigit():
-                print(Fore.RED + "❌ ID harus berupa angka!")
-                input(Fore.YELLOW + "Tekan Enter untuk coba lagi...")
+                print(Fore.RED + "❌ ID harus angka!")
+                input("Enter...")
                 continue
+            
             idpeminjaman = int(id_input)
+
             if idpeminjaman not in valid_ids:
-                print(Fore.RED + "❌ ID tidak ada di daftar di atas!")
-                input(Fore.YELLOW + "Tekan Enter untuk coba lagi...")
+                print(Fore.RED + "❌ ID tersebut tidak ada di daftar!")
+                input("Enter...")
                 continue
             break
-        cur.execute(
-            "UPDATE Peminjaman SET idstatuspeminjaman = 2 WHERE idpeminjaman = %s",
-            (idpeminjaman,)
-        )
-        cur.execute(
-            """
-            SELECT DISTINCT dp.idalat FROM DetailPeminjaman dp
-            WHERE dp.idpeminjaman = %s
-            """,
-            (idpeminjaman,)
-        )
-        alat_list = cur.fetchall()
-        cur.execute("SELECT idstatusalat FROM StatusAlat WHERE status = 'Tidak Tersedia'")
-        status_row = cur.fetchone()
-        if status_row:
-            id_status_tidak_tersedia = status_row[0]
-        else:
-            cur.execute("INSERT INTO StatusAlat (status) VALUES ('Tidak Tersedia') RETURNING idstatusalat")
-            id_status_tidak_tersedia = cur.fetchone()[0]
-        for alat in alat_list:
-            idalat = alat[0]
-            cur.execute(
-                "UPDATE AlatPertanian SET idstatusalat = %s WHERE idalat = %s",
-                (id_status_tidak_tersedia, idalat)
+
+        # biar bisa milih
+        pilihan = q.select(
+            "Setujui atau tolak peminjaman?",
+            choices=["✔ Setujui", "❌ Tolak"]
+        ).ask()
+
+        if pilihan == "❌ Tolak":
+            # update peminjaman
+            cur.execute("""
+                UPDATE Peminjaman
+                SET idstatuspeminjaman = 3   -- Ditolak
+                WHERE idpeminjaman = %s
+            """, (idpeminjaman,))
+
+            cur.execute("""
+                UPDATE AlatPertanian
+                SET idstatusalat = 1
+                WHERE idalat IN (
+                    SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
+                )
+            """, (idpeminjaman,))
+
+            conn.commit()
+            print(Fore.RED + "\n❌ Peminjaman ditolak owner.")
+            input("Enter...")
+            return
+        
+        cur.execute("""
+            UPDATE Peminjaman
+            SET idstatuspeminjaman = 2
+            WHERE idpeminjaman = %s
+        """, (idpeminjaman,))
+
+        cur.execute("""
+            UPDATE AlatPertanian
+            SET idstatusalat = 3
+            WHERE idalat IN (
+                SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
             )
+        """, (idpeminjaman,))
+
         conn.commit()
-        header()
-        print(Fore.GREEN + "✅ Peminjaman telah dikonfirmasi!")
-        print(Fore.GREEN + "✅ Status alat diubah menjadi 'Tidak Tersedia'")
-        input(Fore.WHITE + "Tekan Enter untuk melanjutkan...")
+        print(Fore.GREEN + "\n✅ Peminjaman disetujui!")
+        print(Fore.GREEN + "🔄 Status alat berubah menjadi 'Dipinjam'")
+        input("Enter...")
+
     except Exception as e:
         print(Fore.RED + f"❌ Error: {e}")
         input()
@@ -1148,6 +1207,7 @@ def konfirmasi_persetujuan_peminjaman():
         if conn:
             cur.close()
             conn.close()
+
 
 def lihat_riwayat_peminjaman_owner():
     global owner_id_skrg
