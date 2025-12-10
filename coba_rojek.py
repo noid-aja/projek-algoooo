@@ -53,7 +53,7 @@ def buat_judul(warna, text):
     spasi_kiri = total_spasi // 2
     spasi_kanan = total_spasi - spasi_kiri
     
-    # Print judul otomatis tergantung fungsi yg di panggil
+    # Print box
     print(Fore.WHITE + Style.BRIGHT + "╔════════════════════════════════════════════════════════╗")
     print(Fore.WHITE + Style.BRIGHT + "║" + warna + " " * spasi_kiri + text + " " * spasi_kanan + Fore.WHITE + "║")
     print(Fore.WHITE + Style.BRIGHT + "╚════════════════════════════════════════════════════════╝")
@@ -193,29 +193,14 @@ def registrasi():
         
         try:
             # ========== INPUT USERNAME ==========
-            while True:
-                username = q.text("Username baru (ctrl+c untuk batal): ").ask()
-                if username is None:
-                    print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
-                    return
-                validasi_username(username)
-                break
-                
+            username = q.text("Username baru (ctrl+c untuk batal): ").ask()
+            validasi_username(username)
+            
             # ========== INPUT PASSWORD ==========
-            while True:
-                password = q.password("Password (ctrl+c untuk batal): ").ask()
-                if password is None:
-                    print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
-                    return
-                if password.strip():
-                    print(Fore.RED + "❌ Password tidak boleh kosong atau spasi saja!")
-                    input(Fore.WHITE + "Tekan Enter untuk ulang...")
-                    continue
-                if len(password) < 8:
-                    print(Fore.RED + "❌ Password minimal 8 karakter!")
-                    input(Fore.WHITE + "Tekan Enter untuk ulang...")
-                    continue
-                break
+            password = q.password("Password (ctrl+c untuk batal): ").ask()
+            if password is None:
+                print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
+                return
             
             # ========== INPUT NO HP (VALIDASI) ==========
             while True:
@@ -460,7 +445,7 @@ def validasi_username(username):
                 print("Username tidak boleh kosong atau spasi saja!")
                 username = input("Masukkan Username: ")
                 continue
-            query = "select * from user where username = %s"
+            query = "select * from akun where username = %s"
             cur.execute(query, (username,))
             cocok = cur.fetchone()
             if cocok is not None:
@@ -475,6 +460,7 @@ def validasi_username(username):
     cur.close()
     conn.close()
     return username
+
 
 # menu peminjam
 def menu_peminjam():
@@ -597,8 +583,17 @@ def ajukan_peminjaman_alat(conn, cur, peminjam_id, rows):
                 print(Fore.RED + "❌ ID harus angka. Coba lagi.")
                 continue
 
-            # cek ketersediaan alat
-            cur.execute("SELECT idalat, namaalat, hargaalat, COALESCE(diskonalat,0) FROM AlatPertanian WHERE idalat = %s AND idstatusalat = 1", (idalat,))
+            # cek ketersediaan alat — pastikan sama dengan query daftar (status 'Tersedia' dan kondisi 'Baik')
+            cur.execute(
+                """
+                SELECT a.idalat, a.namaalat, a.hargaalat, COALESCE(a.diskonalat,0)
+                FROM AlatPertanian a
+                JOIN StatusAlat s ON a.idstatusalat = s.idstatusalat
+                JOIN KondisiAlat k ON a.idkondisialat = k.idkondisialat
+                WHERE a.idalat = %s AND s.status = 'Tersedia' AND k.kondisi = 'Baik'
+                """,
+                (idalat,)
+            )
             alat_row = cur.fetchone()
             if not alat_row:
                 print(Fore.RED + "❌ Alat tidak ditemukan atau tidak tersedia. Coba lagi.")
@@ -814,10 +809,11 @@ def kembalikan_alat():
             RETURNING iddenda
             """
             
+            fines_to_link = []
             cur.execute(query_denda, (f"Keterlambatan {hari_telat} hari", 15000 * hari_telat))
-            iddenda = cur.fetchone()[0]
-            
-            print(Fore.YELLOW + f"💰 Denda: RP. {15000 * hari_telat}")
+            d_id = cur.fetchone()[0]
+            fines_to_link.append(d_id)
+            print(Fore.YELLOW + f"💰 Denda keterlambatan: RP. {15000 * hari_telat}")
         
         # ========== INSERT KE TABEL PENGEMBALIAN ==========
         # statuspengembalian: 1 = Belum Dikembalikan, 2 = Dikembalikan, 3 = Menunggu Pemeriksaan
@@ -827,7 +823,23 @@ def kembalikan_alat():
         VALUES (%s, %s, %s, %s)
         """
         
-        cur.execute(query_pengembalian, (today, idpeminjaman, 2, iddenda))
+        # Insert pengembalian: set to 'Menunggu Pemeriksaan' (3) so owner can review and add fines
+        query_pengembalian = """
+        INSERT INTO Pengembalian (tanggalpengembalian, idpeminjaman, idstatuspengembalian, iddenda)
+        VALUES (%s, %s, %s, %s)
+        RETURNING idpengembalian
+        """
+        
+
+        cur.execute(query_pengembalian, (today, idpeminjaman, 3, None))
+        idpengembalian = cur.fetchone()[0]
+
+        if 'fines_to_link' in locals() and fines_to_link:
+            for did in fines_to_link:
+                try:
+                    cur.execute("INSERT INTO PengembalianDenda (idpengembalian, iddenda) VALUES (%s, %s)", (idpengembalian, did))
+                except Exception:
+                    pass
         
         # ========== UPDATE STATUS PEMINJAMAN JADI "SELESAI" ==========
         # statusPeminjaman: 1 = Pending, 2 = Disetujui, 3 = Ditolak, 4 = Selesai
@@ -837,18 +849,23 @@ def kembalikan_alat():
         )
         
         # ========== UPDATE STATUS ALAT JADI "TERSEDIA" ==========
-        # Ambil idalat dari DetailPeminjaman
+        # Ambil semua idalat dari DetailPeminjaman
         cur.execute(
             "SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s",
             (idpeminjaman,)
         )
-        idalat = cur.fetchone()[0]
+        idalat_rows = cur.fetchall()
         
         # StatusAlat: 1 = Tersedia, 2 = Dipinjam, 3 = Pending, 4 = Tidak Tersedia
-        cur.execute(
-            "UPDATE AlatPertanian SET idstatusalat = 1 WHERE idalat = %s",
-            (idalat,)
-        )
+        # Set semua alat terkait menjadi tersedia kembali
+        for r in idalat_rows:
+            try:
+                cur.execute(
+                    "UPDATE AlatPertanian SET idstatusalat = 1 WHERE idalat = %s",
+                    (r[0],)
+                )
+            except Exception:
+                pass
         
         conn.commit()
         
@@ -877,6 +894,48 @@ def kembalikan_alat():
         if conn:
             cur.close()
             conn.close()
+
+def validasi_nama_alat(prompt_label):
+    simbol = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', ',', '_',
+              '-', '=', '[', ']', '~', '+', '{', '}', '<', '>', '?', '/']
+
+    while True:
+        nama = q.text(prompt_label).ask()
+
+        # User batal (ctrl+c)
+        if nama is None:
+            print(Fore.YELLOW + "\n⬅ Dibatalkan\n")
+            return None
+
+        # Tidak boleh kosong atau spasi doang
+        if not nama.strip():
+            print(Fore.RED + "❌ Nama alat tidak boleh kosong!")
+            input(Fore.WHITE + "Tekan Enter untuk ulang...")
+            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
+            continue
+
+        # Tidak boleh simbol
+        if any(s in nama for s in simbol):
+            print(Fore.RED + "❌ Nama alat tidak boleh mengandung simbol!")
+            input(Fore.WHITE + "Tekan Enter untuk ulang...")
+            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
+            continue
+
+        # Tidak boleh angka semua
+        if nama.isdigit():
+            print(Fore.RED + "❌ Nama alat tidak boleh angka semua!")
+            input(Fore.WHITE + "Tekan Enter untuk ulang...")
+            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
+            continue
+
+        # Minimal 3 karakter
+        if len(nama) < 3:
+            print(Fore.RED + "❌ Nama alat minimal 3 karakter!")
+            input(Fore.WHITE + "Tekan Enter untuk ulang...")
+            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
+            continue
+
+        return nama   # VALID
 
 # menu owner
 def menu_owner():
@@ -1272,6 +1331,7 @@ def konfirmasi_persetujuan_peminjaman():
         SELECT
             p.idpeminjaman,
             pm.username AS peminjam,
+            a.namaalat,
             COUNT(dp.idalat) AS jumlah_alat,
             'RP ' || SUM(dp.harga)::TEXT AS total_harga,
             'RP ' || p.dp::TEXT AS dp,
@@ -1281,7 +1341,7 @@ def konfirmasi_persetujuan_peminjaman():
         JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
         JOIN AlatPertanian a ON dp.idalat = a.idalat
         WHERE p.idstatuspeminjaman = 1 AND a.idowner = %s
-        GROUP BY p.idpeminjaman, pm.username, p.dp, p.tenggatpeminjaman
+        GROUP BY p.idpeminjaman, pm.username, a.namaalat, p.dp, p.tenggatpeminjaman
         ORDER BY p.idpeminjaman;
         """
         cur.execute(query, (owner_id_skrg,))
@@ -1294,7 +1354,7 @@ def konfirmasi_persetujuan_peminjaman():
         while True:
             header()
             buat_judul(Fore.YELLOW, "KONFIRMASI PERSETUJUAN PEMINJAMAN")
-            df = pd.DataFrame(rows, columns=['ID Pinjam', 'Peminjam', 'Jumlah Alat', 'Total Harga', 'DP', 'Tenggat'])
+            df = pd.DataFrame(rows, columns=['ID Pinjam', 'Peminjam','Nama alat', 'Jumlah Alat', 'Total Harga', 'DP', 'Tenggat'])
             print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
             print()
             id_input = q.text("Masukkan ID peminjaman (ctrl+c untuk batal): ").ask()
@@ -1501,14 +1561,13 @@ def konfirmasi_pengembalian():
         
         query = """
         SELECT pen.idpengembalian, pm.username, a.namaalat, pen.tanggalpengembalian,
-        pen.idpeminjaman, COALESCE(d.biayadenda, 0) as denda
+        pen.idpeminjaman
         FROM Pengembalian pen
         JOIN Peminjaman p ON pen.idpeminjaman = p.idpeminjaman
         JOIN Peminjam pm ON p.idpeminjam = pm.idpeminjam
         JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
         JOIN AlatPertanian a ON dp.idalat = a.idalat
-        LEFT JOIN Denda d ON pen.iddenda = d.iddenda
-        WHERE a.idowner = %s AND pen.idstatuspengembalian = 1
+        WHERE a.idowner = %s AND pen.idstatuspengembalian IN (1,3)
         """
         
         cur.execute(query, (owner_id_skrg,))
@@ -1519,7 +1578,7 @@ def konfirmasi_pengembalian():
             input()
             return
         
-        df = pd.DataFrame(rows, columns=['ID Return', 'Peminjam', 'Alat', 'Tgl Return', 'ID Pinjam', 'Denda'])
+        df = pd.DataFrame(rows, columns=['ID Return', 'Peminjam', 'Alat', 'Tgl Return', 'ID Pinjam'])
         print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
         print()
         
@@ -1529,15 +1588,46 @@ def konfirmasi_pengembalian():
             return      
         idpengembalian = int(idpengembalian_str)
         
-        # ========== UPDATE STATUS PENGEMBALIAN JADI "DIKEMBALIKAN" ==========
-        # statuspengembalian: 1 = Belum Dikembalikan, 2 = Dikembalikan, 3 = Menunggu Pemeriksaan
-        cur.execute(
-            "UPDATE Pengembalian SET idstatuspengembalian = 2 WHERE idpengembalian = %s",
-            (idpengembalian,)
-        )
-        conn.commit()  
+        # Owner can add multiple fines (e.g. rusak, hilang) before finalizing
+        total_added = 0
+        while True:
+            add_more = q.confirm("Tambahkan denda (rusak/hilang/lainnya) untuk pengembalian ini?").ask()
+            if not add_more:
+                break
+            jenis = q.text("Jenis pelanggaran (mis. Rusak/Hilang):").ask()
+            if jenis is None:
+                print(Fore.YELLOW + "Batal menambahkan denda")
+                continue
+            while True:
+                biaya_str = q.text("Masukkan jumlah denda (angka):").ask()
+                if biaya_str is None:
+                    biaya = None
+                    break
+                try:
+                    biaya = int(biaya_str)
+                    break
+                except ValueError:
+                    print(Fore.RED + "Masukkan angka yang valid untuk biaya.")
+            if biaya is None:
+                continue
+            # insert into Denda and link to Pengembalian via PengembalianDenda
+            cur.execute("INSERT INTO Denda (jenispelanggaran, biayadenda) VALUES (%s, %s) RETURNING iddenda", (jenis, biaya))
+            new_did = cur.fetchone()[0]
+            try:
+                cur.execute("INSERT INTO PengembalianDenda (idpengembalian, iddenda) VALUES (%s, %s)", (idpengembalian, new_did))
+            except Exception:
+                # If linking table doesn't exist, just ignore linking but Denda is inserted
+                pass
+            total_added += biaya
+            print(Fore.GREEN + f"✔️ Denda '{jenis}' sebesar Rp. {biaya} ditambahkan.")
+
+        # finalize pengembalian
+        cur.execute("UPDATE Pengembalian SET idstatuspengembalian = 2 WHERE idpengembalian = %s", (idpengembalian,))
+        conn.commit()
         print()
-        print(Fore.GREEN + "✅ Pengembalian telah dikonfirmasi oleh owner!")
+        print(Fore.GREEN + "✅ Pengembalian telah dikonfirmasi dan diproses oleh owner!")
+        if total_added > 0:
+            print(Fore.YELLOW + f"⚠️ Total denda tambahan: Rp. {total_added}")
         input(Fore.WHITE + "Tekan Enter untuk melanjutkan...")
     
     except ValueError:
