@@ -183,14 +183,11 @@ def login_owner():
 
 # registrasi akun peminjam
 def registrasi():
+    conn, cursor = None, None
     while True:
         bersih_terminal()
         header()
         buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
-        
-        conn = None
-        cursor = None
-        
         try:
             # ========== INPUT USERNAME ==========
             username = q.text("Username baru (ctrl+c untuk batal): ").ask()
@@ -241,7 +238,38 @@ def registrasi():
                     print(Fore.WHITE + f"Username : {username}")
                     print(Fore.WHITE + f"Password : {'*' * len(password)}\n")
                     continue
-                
+                # cek apakah no_hp sudah terdaftar
+                try:
+                    conn_check, cur_check = connectDB()
+                    if conn_check is None:
+                        print(Fore.YELLOW + "⚠️ Tidak dapat memverifikasi No. HP saat ini (koneksi DB gagal).")
+                    else:
+                        cur_check.execute("SELECT username FROM Peminjam WHERE nohp = %s", (no_hp,))
+                        row_dup = cur_check.fetchone()
+                        cur_check.close()
+                        conn_check.close()
+                        if row_dup:
+                            print(Fore.RED + f"❌ No. HP {no_hp} sudah terdaftar. Silakan gunakan nomor lain.")
+                            input(Fore.WHITE + "Tekan Enter untuk ulang...")
+                            bersih_terminal()
+                            header()
+                            buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
+                            print(Fore.YELLOW + "Data yang sudah diisi:")
+                            print(Fore.WHITE + f"Username : {username}")
+                            print(Fore.WHITE + f"Password : {'*' * len(password)}\n")
+                            continue
+                except Exception:
+                    # jika pengecekan gagal, jangan blokir pendaftaran; lanjutkan dan periksa lagi nanti
+                    try:
+                        if cur_check:
+                            cur_check.close()
+                    except Exception:
+                        pass
+                    try:
+                        if conn_check:
+                            conn_check.close()
+                    except Exception:
+                        pass
                 break
             
             # ========== INPUT NIK (VALIDASI) ==========
@@ -274,7 +302,39 @@ def registrasi():
                     print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     print(Fore.WHITE + f"No. HP   : {no_hp}\n")
                     continue
-                
+                # cek apakah NIK sudah terdaftar
+                try:
+                    conn_check, cur_check = connectDB()
+                    if conn_check is None:
+                        print(Fore.YELLOW + "⚠️ Tidak dapat memverifikasi NIK saat ini (koneksi DB gagal).")
+                    else:
+                        cur_check.execute("SELECT username FROM Peminjam WHERE nik = %s", (nik,))
+                        row_dup = cur_check.fetchone()
+                        cur_check.close()
+                        conn_check.close()
+                        if row_dup:
+                            print(Fore.RED + f"❌ NIK {nik} sudah terdaftar. Silakan gunakan NIK lain.")
+                            input(Fore.WHITE + "Tekan Enter untuk ulang...")
+                            bersih_terminal()
+                            header()
+                            buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
+                            print(Fore.YELLOW + "Data yang sudah diisi:")
+                            print(Fore.WHITE + f"Username : {username}")
+                            print(Fore.WHITE + f"Password : {'*' * len(password)}")
+                            print(Fore.WHITE + f"No. HP   : {no_hp}\n")
+                            continue
+                except Exception:
+                    try:
+                        if cur_check:
+                            cur_check.close()
+                    except Exception:
+                        pass
+                    try:
+                        if conn_check:
+                            conn_check.close()
+                    except Exception:
+                        pass
+
                 break
             
             # ========== INPUT TANGGAL LAHIR (VALIDASI) ==========
@@ -306,15 +366,86 @@ def registrasi():
                 print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
                 return
             
-            nama_desa = q.text("Desa (ctrl+c untuk batal): ").ask()
-            if nama_desa is None:
-                print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
-                return
+            # ========== SELECT KECAMATAN FROM DATABASE ==========
+            conn_temp, cursor_temp = connectDB()
+            if conn_temp is None:
+                print(Fore.RED + "❌ Gagal terhubung ke database untuk memuat kecamatan")
+                input()
+                continue
             
-            nama_kecamatan = q.text("Kecamatan (ctrl+c untuk batal): ").ask()
-            if nama_kecamatan is None:
-                print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
-                return
+            try:
+                cursor_temp.execute("SELECT idkecamatan, kecamatan FROM Kecamatan ORDER BY kecamatan")
+                kecamatan_rows = cursor_temp.fetchall()
+            except Exception as e:
+                print(Fore.RED + f"❌ Error saat memuat kecamatan: {e}")
+                input()
+                cursor_temp.close()
+                conn_temp.close()
+                continue
+            
+            kecamatan_dict = {k[1]: k[0] for k in kecamatan_rows}
+            kecamatan_list = [k[1] for k in kecamatan_rows]
+            kecamatan_list.append("➕ Tambah Kecamatan Baru")
+            
+            pilihan_kecamatan = q.select(
+                "Pilih Kecamatan (atau tambah baru):",
+                choices=kecamatan_list
+            ).ask()
+            
+            if pilihan_kecamatan == "➕ Tambah Kecamatan Baru":
+                nama_kecamatan = q.text("Masukkan nama Kecamatan baru (ctrl+c untuk batal): ").ask()
+                if nama_kecamatan is None:
+                    print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
+                    cursor_temp.close()
+                    conn_temp.close()
+                    return
+            else:
+                nama_kecamatan = pilihan_kecamatan
+            
+            # ========== SELECT DESA FROM DATABASE (BERDASARKAN KECAMATAN) ==========
+            try:
+                # Ambil ID kecamatan
+                if nama_kecamatan in kecamatan_dict:
+                    idkecamatan = kecamatan_dict[nama_kecamatan]
+                else:
+                    # Kecamatan baru, akan dibuat saat insert
+                    idkecamatan = None
+                
+                if idkecamatan:
+                    cursor_temp.execute(
+                        "SELECT iddesa, namadesa FROM Desa WHERE idkecamatan = %s ORDER BY namadesa",
+                        (idkecamatan,)
+                    )
+                    desa_rows = cursor_temp.fetchall()
+                else:
+                    desa_rows = []
+            except Exception as e:
+                print(Fore.RED + f"❌ Error saat memuat desa: {e}")
+                input()
+                cursor_temp.close()
+                conn_temp.close()
+                continue
+            
+            desa_list = [d[1] for d in desa_rows]
+            desa_list.append("➕ Tambah Desa Baru")
+            
+            pilihan_desa = q.select(
+                "Pilih Desa (atau tambah baru):",
+                choices=desa_list
+            ).ask()
+            
+            if pilihan_desa == "➕ Tambah Desa Baru":
+                nama_desa = q.text("Masukkan nama Desa baru (ctrl+c untuk batal): ").ask()
+                if nama_desa is None:
+                    print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
+                    cursor_temp.close()
+                    conn_temp.close()
+                    return
+            else:
+                nama_desa = pilihan_desa
+            
+            cursor_temp.close()
+            conn_temp.close()
             
             # ========== VERIFIKASI DATA ==========
             bersih_terminal()
@@ -346,6 +477,38 @@ def registrasi():
                 print(Fore.RED + "❌ Gagal terhubung ke database")
                 input()
                 break
+            
+            # ====== CEK KEUNIKAN NIK DAN NOMOR HP ======
+            try:
+                cursor.execute("SELECT username, nohp, nik FROM Peminjam WHERE nohp = %s OR nik = %s", (no_hp, nik))
+                exists_row = cursor.fetchone()
+                if exists_row:
+                    existing_username, existing_nohp, existing_nik = exists_row
+                    msgs = []
+                    if existing_nohp == no_hp:
+                        msgs.append(f"No. HP {no_hp} sudah terdaftar (user: {existing_username}).")
+                    if existing_nik == nik:
+                        msgs.append(f"NIK {nik} sudah terdaftar (user: {existing_username}).")
+                    print(Fore.RED + "❌ Gagal registrasi: " + " ".join(msgs))
+                    input(Fore.WHITE + "Tekan Enter untuk ulang dan gunakan data lain...")
+                    # Tutup koneksi dan ulangi loop registrasi
+                    if cursor:
+                        cursor.close()
+                    if conn:
+                        conn.close()
+                    continue
+            except Exception as e:
+                # Jika query pengecekan gagal, rollback dan laporkan, lalu lanjutkan error handling
+                if conn:
+                    conn.rollback()
+                print(Fore.RED + f"❌ Error saat memeriksa NIK/No HP: {e}")
+                traceback.print_exc()
+                input(Fore.WHITE + "Tekan Enter untuk coba lagi...")
+                if cursor:
+                    cursor.close()
+                if conn:
+                    conn.close()
+                continue
             
             # 1. Kecamatan
             cursor.execute(
@@ -403,12 +566,12 @@ def registrasi():
             input(Fore.WHITE + "\nTekan Enter untuk kembali...")
             break
         
-        except psycopg2.Error as e:
+        except psycopg2.Error as p:
             if conn:
                 conn.rollback()
             bersih_terminal()
             header()
-            print(Fore.RED + f"❌ Gagal registrasi: {e}")
+            print(Fore.RED + f"❌ Gagal registrasi: {p}")
             input(Fore.WHITE + "Tekan Enter untuk coba lagi...")
         
         except Exception as e:
@@ -425,7 +588,9 @@ def registrasi():
                 conn.close()
 
 def validasi_username(username):
-    cur, conn = connectDB()
+    conn, cur = connectDB()
+    if conn is None:
+        return username
     simbol =['!','@','#','$','%','^','&','*','(',')',',','_','-','=','[',']','~','+','{','}','<','>','?','/']
     while True:
         try:
@@ -445,7 +610,7 @@ def validasi_username(username):
                 print("Username tidak boleh kosong atau spasi saja!")
                 username = input("Masukkan Username: ")
                 continue
-            query = "select * from akun where username = %s"
+            query = "select * from Peminjam where username = %s"
             cur.execute(query, (username,))
             cocok = cur.fetchone()
             if cocok is not None:
@@ -829,7 +994,7 @@ def kembalikan_alat():
         VALUES (%s, %s, %s, %s)
         RETURNING idpengembalian
         """
-        
+
 
         cur.execute(query_pengembalian, (today, idpeminjaman, 3, None))
         idpengembalian = cur.fetchone()[0]
@@ -894,48 +1059,6 @@ def kembalikan_alat():
         if conn:
             cur.close()
             conn.close()
-
-def validasi_nama_alat(prompt_label):
-    simbol = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', ',', '_',
-              '-', '=', '[', ']', '~', '+', '{', '}', '<', '>', '?', '/']
-
-    while True:
-        nama = q.text(prompt_label).ask()
-
-        # User batal (ctrl+c)
-        if nama is None:
-            print(Fore.YELLOW + "\n⬅ Dibatalkan\n")
-            return None
-
-        # Tidak boleh kosong atau spasi doang
-        if not nama.strip():
-            print(Fore.RED + "❌ Nama alat tidak boleh kosong!")
-            input(Fore.WHITE + "Tekan Enter untuk ulang...")
-            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
-            continue
-
-        # Tidak boleh simbol
-        if any(s in nama for s in simbol):
-            print(Fore.RED + "❌ Nama alat tidak boleh mengandung simbol!")
-            input(Fore.WHITE + "Tekan Enter untuk ulang...")
-            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
-            continue
-
-        # Tidak boleh angka semua
-        if nama.isdigit():
-            print(Fore.RED + "❌ Nama alat tidak boleh angka semua!")
-            input(Fore.WHITE + "Tekan Enter untuk ulang...")
-            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
-            continue
-
-        # Minimal 3 karakter
-        if len(nama) < 3:
-            print(Fore.RED + "❌ Nama alat minimal 3 karakter!")
-            input(Fore.WHITE + "Tekan Enter untuk ulang...")
-            header(); buat_judul(Fore.YELLOW, "KELOLA ALAT PERTANIAN")
-            continue
-
-        return nama   # VALID
 
 # menu owner
 def menu_owner():
@@ -1331,7 +1454,6 @@ def konfirmasi_persetujuan_peminjaman():
         SELECT
             p.idpeminjaman,
             pm.username AS peminjam,
-            a.namaalat,
             COUNT(dp.idalat) AS jumlah_alat,
             'RP ' || SUM(dp.harga)::TEXT AS total_harga,
             'RP ' || p.dp::TEXT AS dp,
@@ -1341,7 +1463,7 @@ def konfirmasi_persetujuan_peminjaman():
         JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
         JOIN AlatPertanian a ON dp.idalat = a.idalat
         WHERE p.idstatuspeminjaman = 1 AND a.idowner = %s
-        GROUP BY p.idpeminjaman, pm.username, a.namaalat, p.dp, p.tenggatpeminjaman
+        GROUP BY p.idpeminjaman, pm.username, p.dp, p.tenggatpeminjaman
         ORDER BY p.idpeminjaman;
         """
         cur.execute(query, (owner_id_skrg,))
@@ -1354,7 +1476,7 @@ def konfirmasi_persetujuan_peminjaman():
         while True:
             header()
             buat_judul(Fore.YELLOW, "KONFIRMASI PERSETUJUAN PEMINJAMAN")
-            df = pd.DataFrame(rows, columns=['ID Pinjam', 'Peminjam','Nama alat', 'Jumlah Alat', 'Total Harga', 'DP', 'Tenggat'])
+            df = pd.DataFrame(rows, columns=['ID Pinjam', 'Peminjam', 'Jumlah Alat', 'Total Harga', 'DP', 'Tenggat'])
             print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
             print()
             id_input = q.text("Masukkan ID peminjaman (ctrl+c untuk batal): ").ask()
@@ -1362,121 +1484,74 @@ def konfirmasi_persetujuan_peminjaman():
                 print(Fore.YELLOW + "⬅️ Dibatalkan")
                 return
 
+            id_input = id_input.strip()
             if not id_input.isdigit():
                 print(Fore.RED + "❌ ID harus angka!")
                 input("Enter...")
                 continue
-            elif pilihan == "🗑️ Hapus alat":
-                try:
-                    # Tampilkan daftar alat milik owner
-                    cur.execute(
-                        "SELECT a.idalat, a.namaalat, a.hargaalat, s.status, k.kondisi FROM AlatPertanian a JOIN StatusAlat s ON a.idstatusalat = s.idstatusalat JOIN KondisiAlat k ON a.idkondisialat = k.idkondisialat WHERE a.idowner = %s ORDER BY a.idalat",
-                        (owner_id_skrg,)
-                    )
-                    alat_rows = cur.fetchall()
-                    if not alat_rows:
-                        print(Fore.YELLOW + "⚠️ Anda belum memiliki alat terdaftar.")
-                        input(Fore.WHITE + "Tekan Enter untuk kembali...")
-                        continue
-                    df = pd.DataFrame(alat_rows, columns=['ID', 'Nama Alat', 'Harga', 'Status', 'Kondisi'])
-                    df['Harga'] = df['Harga'].apply(lambda x: f"Rp. {x}")
-                    print(Fore.WHITE + tb.tabulate(df, headers='keys', tablefmt='fancy_grid', showindex=False))
 
-                    id_str = q.text("Masukkan ID alat yang ingin dihapus (ctrl+c untuk batal):").ask()
-                    if id_str is None:
-                        print(Fore.YELLOW + "\n⬅️ Batal")
-                        continue
-                    idalat = int(id_str)
-
-                    # Pastikan alat milik owner
-                    cur.execute("SELECT idalat, namaalat FROM AlatPertanian WHERE idalat = %s AND idowner = %s", (idalat, owner_id_skrg))
-                    found = cur.fetchone()
-                    if not found:
-                        print(Fore.RED + "❌ Alat tidak ditemukan atau bukan milik Anda.")
-                        input(Fore.WHITE + "Tekan Enter untuk kembali...")
-                        continue
-
-                    konf = input(Fore.YELLOW + f"Yakin ingin menghapus alat ID {idalat} - {found[1]}? (y/n): " + Fore.WHITE).lower()
-                    if konf != 'y':
-                        print(Fore.YELLOW + "🔁 Dibatalkan")
-                        input(Fore.WHITE + "Tekan Enter untuk kembali...")
-                        continue
-
-                    # Coba cari idkondisialat untuk label 'Tidak Tersedia' (case-insensitive)
-                    cur.execute("SELECT idkondisialat FROM KondisiAlat WHERE LOWER(kondisi) = LOWER(%s)", ('Tidak Tersedia',))
-                    row_kond = cur.fetchone()
-                    idkond = row_kond[0] if row_kond else None
-
-                    # Lakukan soft delete: set status jadi 'Tidak Tersedia' (idstatusalat = 4) dan update kondisi bila ada
-                    if idkond:
-                        cur.execute("UPDATE AlatPertanian SET idstatusalat = 4, idkondisialat = %s WHERE idalat = %s", (idkond, idalat))
-                    else:
-                        cur.execute("UPDATE AlatPertanian SET idstatusalat = 4 WHERE idalat = %s", (idalat,))
-
-                    conn.commit()
-                    print(Fore.GREEN + "✅ Alat berhasil dihapus dari daftar alat.")
-                    input(Fore.WHITE + "Tekan Enter untuk kembali...")
-                except Exception as e:
-                    if conn:
-                        conn.rollback()
-                    print(Fore.RED + f"❌ Gagal menghapus alat: {e}")
-                    traceback.print_exc()
-                    input(Fore.WHITE + "Tekan Enter untuk kembali...")
-                # continue removed: this block was misplaced inside peminjaman confirmation
-            
             idpeminjaman = int(id_input)
-
             if idpeminjaman not in valid_ids:
                 print(Fore.RED + "❌ ID tersebut tidak ada di daftar!")
                 input("Enter...")
                 continue
             break
 
-        # biar bisa milih
+        # pilih setuju / tolak
         pilihan = q.select(
             "Setujui atau tolak peminjaman?",
             choices=["✔ Setujui", "❌ Tolak"]
         ).ask()
 
         if pilihan == "❌ Tolak":
-            # update peminjaman
+            try:
+                cur.execute("""
+                    UPDATE Peminjaman
+                    SET idstatuspeminjaman = 3   -- Ditolak
+                    WHERE idpeminjaman = %s
+                """, (idpeminjaman,))
+
+                cur.execute("""
+                    UPDATE AlatPertanian
+                    SET idstatusalat = 1
+                    WHERE idalat IN (
+                        SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
+                    )
+                """, (idpeminjaman,))
+
+                conn.commit()
+                print(Fore.RED + "\n❌ Peminjaman ditolak owner.")
+                input("Enter...")
+            except Exception as e:
+                conn.rollback()
+                print(Fore.RED + f"❌ Gagal menolak peminjaman: {e}")
+                input()
+            return
+
+        # jika setuju
+        try:
             cur.execute("""
                 UPDATE Peminjaman
-                SET idstatuspeminjaman = 3   -- Ditolak
+                SET idstatuspeminjaman = 2
                 WHERE idpeminjaman = %s
             """, (idpeminjaman,))
 
             cur.execute("""
                 UPDATE AlatPertanian
-                SET idstatusalat = 1
+                SET idstatusalat = 3
                 WHERE idalat IN (
                     SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
                 )
             """, (idpeminjaman,))
 
             conn.commit()
-            print(Fore.RED + "\n❌ Peminjaman ditolak owner.")
+            print(Fore.GREEN + "\n✅ Peminjaman disetujui!")
+            print(Fore.GREEN + "🔄 Status alat berubah menjadi 'Dipinjam'")
             input("Enter...")
-            return
-        
-        cur.execute("""
-            UPDATE Peminjaman
-            SET idstatuspeminjaman = 2
-            WHERE idpeminjaman = %s
-        """, (idpeminjaman,))
-
-        cur.execute("""
-            UPDATE AlatPertanian
-            SET idstatusalat = 3
-            WHERE idalat IN (
-                SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
-            )
-        """, (idpeminjaman,))
-
-        conn.commit()
-        print(Fore.GREEN + "\n✅ Peminjaman disetujui!")
-        print(Fore.GREEN + "🔄 Status alat berubah menjadi 'Dipinjam'")
-        input("Enter...")
+        except Exception as e:
+            conn.rollback()
+            print(Fore.RED + f"❌ Gagal menyetujui peminjaman: {e}")
+            input()
 
     except Exception as e:
         print(Fore.RED + f"❌ Error: {e}")
@@ -1582,11 +1657,26 @@ def konfirmasi_pengembalian():
         print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
         print()
         
-        idpengembalian_str = q.text("Masukkan ID pengembalian (ctrl+c untuk batal): ").ask()
-        if idpengembalian_str is None:
-            print(Fore.YELLOW + "\n⬅️ Dibatalkan")
-            return      
-        idpengembalian = int(idpengembalian_str)
+        # Buat set dari valid IDs untuk validasi
+        valid_ids = {r[0] for r in rows}
+        
+        while True:
+            idpengembalian_str = q.text("Masukkan ID pengembalian (ctrl+c untuk batal): ").ask()
+            if idpengembalian_str is None:
+                print(Fore.YELLOW + "\n⬅️ Dibatalkan")
+                return
+            
+            try:
+                idpengembalian = int(idpengembalian_str)
+            except ValueError:
+                print(Fore.RED + "❌ ID harus berupa angka!")
+                continue
+            
+            if idpengembalian not in valid_ids:
+                print(Fore.RED + "❌ ID pengembalian tidak ada di daftar!")
+                continue
+            
+            break
         
         # Owner can add multiple fines (e.g. rusak, hilang) before finalizing
         total_added = 0
