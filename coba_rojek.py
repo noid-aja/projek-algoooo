@@ -286,7 +286,7 @@ def registrasi():
                     header()
                     buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
                     print(Fore.YELLOW + "Data yang sudah diisi:")
-                    username = print(Fore.WHITE + f"Username : {username}")
+                    print(Fore.WHITE + f"Username : {username}")
                     print(Fore.WHITE + f"Password : {'*' * len(password)}")
                     print(Fore.WHITE + f"No. HP   : {no_hp}\n")
                     continue
@@ -853,51 +853,61 @@ def lihat_riwayat_peminjaman():
     global peminjam_id
     header()
     buat_judul(Fore.MAGENTA, "RIWAYAT PEMINJAMAN SAYA")
+    
     try:
         conn, cur = connectDB()
         if conn is None:
             print(Fore.RED + "❌ Gagal terhubung ke database")
             input()
             return
+        
         query = """
-        SELECT
+        SELECT 
             p.idpeminjaman,
-            a.namaalat as Nama_Alat,
-            'RP ' || dp.harga::TEXT as Harga_Satuan,
-            'RP ' || dp.diskon::TEXT as Diskon,
+            a.namaalat,
+            'Rp ' || dp.harga::TEXT as Harga,
             p.tanggalpeminjaman as Tgl_Pinjam,
             p.tenggatpeminjaman as Tgl_Tenggat,
             sp.statuspeminjaman as Status,
-            COALESCE(pr.tanggalpengembalian::TEXT, '-') as Tgl_Kembali
+            COALESCE(pr.tanggalpengembalian::TEXT, '-') as Tgl_Kembali,
+            COALESCE(
+                'Rp ' || SUM(d.biayadenda)::TEXT,
+                '-'
+            ) as Denda_Nominal
         FROM Peminjaman p
         JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
         JOIN AlatPertanian a ON dp.idalat = a.idalat
         JOIN StatusPeminjaman sp ON p.idstatuspeminjaman = sp.idstatuspeminjaman
         LEFT JOIN Pengembalian pr ON p.idpeminjaman = pr.idpeminjaman
+        LEFT JOIN DetailDenda dd ON pr.idpengembalian = dd.idpengembalian
+        LEFT JOIN Denda d ON dd.iddenda = d.iddenda
         WHERE p.idpeminjam = %s
+        GROUP BY p.idpeminjaman, a.namaalat, dp.harga, 
+                 p.tanggalpeminjaman, p.tenggatpeminjaman, sp.statuspeminjaman,
+                 pr.tanggalpengembalian
         ORDER BY p.idpeminjaman DESC
         """
+        
         cur.execute(query, (peminjam_id,))
         rows = cur.fetchall()
+        
         if not rows:
             print(Fore.YELLOW + "⚠️ Anda belum memiliki riwayat peminjaman.")
             input(Fore.WHITE + "Tekan Enter untuk kembali...")
             return
-        df = pd.DataFrame(rows, columns=['ID Peminjaman', 'Nama Alat', 'Harga', 'Diskon', 'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali'])
+        
+        df = pd.DataFrame(rows, columns=[
+            'ID', 'Alat', 'Harga', 
+            'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali', 'Denda Nominal'
+        ])
+        
         print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
-        print()
-        total_peminjaman = len(rows)
-        selesai = sum(1 for row in rows if row[6] == 'Dikembalikan')
-        pending = sum(1 for row in rows if row[6] == 'Pending')
-        disetujui = sum(1 for row in rows if row[6] == 'Disetujui')
-        print(Fore.YELLOW + f"\n📊 Statistik:")
-        print(Fore.WHITE + f" Total Peminjaman: {total_peminjaman}")
-        print(Fore.GREEN + f" ✅ Selesai (Dikembalikan): {selesai}")
-        print(Fore.YELLOW + f" ⏳ Disetujui: {disetujui}")
-        print(Fore.CYAN + f" ⏰ Pending: {pending}")
+        
         input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+        
     except Exception as e:
         print(Fore.RED + f"❌ Error: {e}")
+        traceback.print_exc()
         input()
     finally:
         if conn:
@@ -1561,57 +1571,64 @@ def konfirmasi_persetujuan_peminjaman():
             cur.close()
             conn.close()
 
-
 def lihat_riwayat_peminjaman_owner():
     global owner_id_skrg
     header()
     buat_judul(Fore.MAGENTA, "RIWAYAT PEMINJAMAN ALAT SAYA")
+    
     try:
         conn, cur = connectDB()
         if conn is None:
             print(Fore.RED + "❌ Gagal terhubung ke database")
             input()
             return
+        
         query = """
-        SELECT
+        SELECT 
             p.idpeminjaman,
             pm.username as Peminjam,
-            a.namaalat as Nama_Alat,
-            'RP ' || dp.harga::TEXT as Harga,
+            a.namaalat,
+            'Rp ' || dp.harga::TEXT as Harga,
             p.tanggalpeminjaman as Tgl_Pinjam,
             p.tenggatpeminjaman as Tgl_Tenggat,
-            sp.statuspeminjaman as Status_Peminjaman,
-            COALESCE(pr.tanggalpengembalian::TEXT, '-') as Tgl_Kembali
+            sp.statuspeminjaman as Status,
+            COALESCE(pr.tanggalpengembalian::TEXT, '-') as Tgl_Kembali,
+            COALESCE(
+                'Rp ' || SUM(d.biayadenda)::TEXT,
+                '-'
+            ) as Denda_Nominal
         FROM Peminjaman p
         JOIN Peminjam pm ON p.idpeminjam = pm.idpeminjam
         JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
         JOIN AlatPertanian a ON dp.idalat = a.idalat
         JOIN StatusPeminjaman sp ON p.idstatuspeminjaman = sp.idstatuspeminjaman
         LEFT JOIN Pengembalian pr ON p.idpeminjaman = pr.idpeminjaman
+        LEFT JOIN DetailDenda dd ON pr.idpengembalian = dd.idpengembalian
+        LEFT JOIN Denda d ON dd.iddenda = d.iddenda
         WHERE a.idowner = %s
+        GROUP BY p.idpeminjaman, pm.username, a.namaalat, dp.harga,
+                 p.tanggalpeminjaman, p.tenggatpeminjaman, sp.statuspeminjaman,
+                 pr.tanggalpengembalian
         ORDER BY p.idpeminjaman DESC
         """
+        
         cur.execute(query, (owner_id_skrg,))
         rows = cur.fetchall()
+        
         if not rows:
             print(Fore.YELLOW + "⚠️ Tidak ada riwayat peminjaman untuk alat Anda.")
             input(Fore.WHITE + "Tekan Enter untuk kembali...")
             return
-        df = pd.DataFrame(rows, columns=['ID Peminjaman', 'Peminjam', 'Nama Alat', 'Harga', 'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali'])
+        
+        df = pd.DataFrame(rows, columns=[
+            'ID', 'Peminjam', 'Alat', 'Harga',
+            'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali', 'Denda Nominal'
+        ])
+        
         print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
-        print()
-        total_peminjaman = len(rows)
-        selesai = sum(1 for row in rows if row[6] == 'Selesai')
-        pending = sum(1 for row in rows if row[6] == 'Pending')
-        disetujui = sum(1 for row in rows if row[6] == 'Disetujui')
-        ditolak = sum(1 for row in rows if row[6] == 'Ditolak')
-        print(Fore.YELLOW + f"\n📊 Statistik:")
-        print(Fore.WHITE + f" Total Peminjaman: {total_peminjaman}")
-        print(Fore.GREEN + f" ✅ Selesai (Dikembalikan): {selesai}")
-        print(Fore.YELLOW + f" ⏳ Disetujui: {disetujui}")
-        print(Fore.CYAN + f" ⏰ Pending: {pending}")
-        print(Fore.RED + f" ❌ Ditolak: {ditolak}")
+        
         input(Fore.WHITE + "\nTekan Enter untuk kembali...")
+        
     except Exception as e:
         print(Fore.RED + f"❌ Error: {e}")
         traceback.print_exc()
@@ -1620,6 +1637,7 @@ def lihat_riwayat_peminjaman_owner():
         if conn:
             cur.close()
             conn.close()
+
 
 def konfirmasi_pengembalian():
     global owner_id_skrg
@@ -1678,7 +1696,6 @@ def konfirmasi_pengembalian():
             
             break
         
-        # Owner can add multiple fines (e.g. rusak, hilang) before finalizing
         total_added = 0
         while True:
             add_more = q.confirm("Tambahkan denda (rusak/hilang/lainnya) untuk pengembalian ini?").ask()
