@@ -839,7 +839,7 @@ def ajukan_peminjaman_alat(conn, cur, peminjam_id, rows):
             harga = int(alat_row[2])
             diskon = int(alat_row[3])
             # Harga adalah harga satuan/flat untuk peminjaman (tidak per-hari)
-            subtotal = harga
+            subtotal = harga - diskon
             selected.append({'idalat': idalat, 'nama': alat_row[1], 'harga': harga, 'diskon': diskon, 'lama': lama_global, 'subtotal': subtotal})
             print(Fore.GREEN + f"✔️ Alat '{alat_row[1]}' ditambahkan (lama {lama_global} hari).")
 
@@ -1614,7 +1614,7 @@ def konfirmasi_persetujuan_peminjaman():
 
             cur.execute("""
                 UPDATE AlatPertanian
-                SET idstatusalat = 3
+                SET idstatusalat = 2
                 WHERE idalat IN (
                     SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
                 )
@@ -1783,11 +1783,11 @@ def konfirmasi_pengembalian():
                     print(Fore.RED + "Masukkan angka yang valid untuk biaya.")
             if biaya is None:
                 continue
-            # insert into Denda and link to Pengembalian via PengembalianDenda
+            # insert into Denda and link to Pengembalian via DetailDenda
             cur.execute("INSERT INTO Denda (jenispelanggaran, biayadenda) VALUES (%s, %s) RETURNING iddenda", (jenis, biaya))
             new_did = cur.fetchone()[0]
             try:
-                cur.execute("INSERT INTO PengembalianDenda (idpengembalian, iddenda) VALUES (%s, %s)", (idpengembalian, new_did))
+                cur.execute("INSERT INTO DetailDenda (idpengembalian, iddenda) VALUES (%s, %s)", (idpengembalian, new_did))
             except Exception:
                 # If linking table doesn't exist, just ignore linking but Denda is inserted
                 pass
