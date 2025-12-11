@@ -25,6 +25,13 @@ def connectDB():
 
 connectDB()
 
+# fungsi untuk format nama (Title Case)
+def proper_case(text):
+    """Convert text ke format Title Case (Proper Case)"""
+    if not text or text is None:
+        return None
+    return text.strip().title()
+
 # biar color berubah tanpa harus reset di setiap fungsi
 init(autoreset=True)
 
@@ -393,34 +400,64 @@ def registrasi():
             ).ask()
             
             if pilihan_kecamatan == "➕ Tambah Kecamatan Baru":
-                nama_kecamatan = q.text("Masukkan nama Kecamatan baru (ctrl+c untuk batal): ").ask()
-                if nama_kecamatan is None:
-                    print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
-                    cursor_temp.close()
-                    conn_temp.close()
-                    return
+                while True:
+                    nama_kecamatan = q.text("Masukkan nama Kecamatan baru (ctrl+c untuk batal): ").ask()
+                    if nama_kecamatan is None:
+                        print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
+                        cursor_temp.close()
+                        conn_temp.close()
+                        return
+                    
+                    # Validasi: tidak boleh kosong
+                    if not nama_kecamatan.strip():
+                        print(Fore.RED + "❌ Nama Kecamatan tidak boleh kosong!")
+                        input(Fore.WHITE + "Tekan Enter untuk ulang...")
+                        bersih_terminal()
+                        header()
+                        buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
+                        continue
+                    
+                    # Format dengan proper_case
+                    nama_kecamatan = proper_case(nama_kecamatan)
+                    
+                    # Cek apakah kecamatan sudah ada (case-insensitive)
+                    if nama_kecamatan.lower() in [k.lower() for k in kecamatan_list if k != "➕ Tambah Kecamatan Baru"]:
+                        print(Fore.RED + f"❌ Kecamatan '{nama_kecamatan}' sudah ada di sistem!")
+                        input(Fore.WHITE + "Tekan Enter untuk ulang...")
+                        bersih_terminal()
+                        header()
+                        buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
+                        continue
+                    break
             else:
                 nama_kecamatan = pilihan_kecamatan
             
             # ========== SELECT DESA FROM DATABASE (BERDASARKAN KECAMATAN) ==========
             try:
-                # Ambil ID kecamatan
-                if nama_kecamatan in kecamatan_dict:
-                    idkecamatan = kecamatan_dict[nama_kecamatan]
-                else:
-                    # Kecamatan baru, akan dibuat saat insert
-                    idkecamatan = None
+                # Query langsung ke database untuk mencari ID kecamatan berdasarkan nama
+                cursor_temp.execute(
+                    "SELECT idkecamatan FROM Kecamatan WHERE kecamatan = %s",
+                    (nama_kecamatan,)
+                )
+                row_kec = cursor_temp.fetchone()
                 
-                if idkecamatan:
+                if row_kec:
+                    idkecamatan = row_kec[0]
+                    # Query desa dari kecamatan yang ditemukan
                     cursor_temp.execute(
                         "SELECT iddesa, namadesa FROM Desa WHERE idkecamatan = %s ORDER BY namadesa",
                         (idkecamatan,)
                     )
                     desa_rows = cursor_temp.fetchall()
+                    print(Fore.GREEN + f"✅ Ditemukan {len(desa_rows)} desa di Kecamatan {nama_kecamatan}")
                 else:
+                    # Kecamatan baru
+                    idkecamatan = None
                     desa_rows = []
+                    print(Fore.YELLOW + f"ℹ️ Kecamatan '{nama_kecamatan}' adalah baru, belum ada desa yang terdaftar.")
             except Exception as e:
                 print(Fore.RED + f"❌ Error saat memuat desa: {e}")
+                traceback.print_exc()
                 input()
                 cursor_temp.close()
                 conn_temp.close()
@@ -429,18 +466,47 @@ def registrasi():
             desa_list = [d[1] for d in desa_rows]
             desa_list.append("➕ Tambah Desa Baru")
             
+            print(Fore.YELLOW + "Silakan pilih desa atau tambah baru.\n")
+            
             pilihan_desa = q.select(
                 "Pilih Desa (atau tambah baru):",
                 choices=desa_list
             ).ask()
             
             if pilihan_desa == "➕ Tambah Desa Baru":
-                nama_desa = q.text("Masukkan nama Desa baru (ctrl+c untuk batal): ").ask()
-                if nama_desa is None:
-                    print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
-                    cursor_temp.close()
-                    conn_temp.close()
-                    return
+                while True:
+                    nama_desa = q.text("Masukkan nama Desa baru (ctrl+c untuk batal): ").ask()
+                    if nama_desa is None:
+                        print(Fore.YELLOW + "\n⬅️ Registrasi dibatalkan - Kembali ke menu utama\n")
+                        cursor_temp.close()
+                        conn_temp.close()
+                        return
+                    
+                    # Validasi: tidak boleh kosong
+                    if not nama_desa.strip():
+                        print(Fore.RED + "❌ Nama Desa tidak boleh kosong!")
+                        input(Fore.WHITE + "Tekan Enter untuk ulang...")
+                        bersih_terminal()
+                        header()
+                        buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
+                        continue
+                    
+                    # Format dengan proper_case
+                    nama_desa = proper_case(nama_desa)
+                    
+                    # Cek apakah desa sudah ada di kecamatan ini (case-insensitive)
+                    # Filter desa_list untuk menghilangkan tombol "Tambah Desa Baru"
+                    desa_list_filter = [d for d in desa_list if d != "➕ Tambah Desa Baru"]
+                    desa_list_lower = [d.lower() for d in desa_list_filter]
+                    
+                    if nama_desa.lower() in desa_list_lower:
+                        print(Fore.RED + f"❌ Desa '{nama_desa}' sudah ada di Kecamatan {nama_kecamatan}!")
+                        input(Fore.WHITE + "Tekan Enter untuk ulang...")
+                        bersih_terminal()
+                        header()
+                        buat_judul(Fore.BLUE, "REGISTRASI AKUN PEMINJAM")
+                        continue
+                    break
             else:
                 nama_desa = pilihan_desa
             
