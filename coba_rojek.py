@@ -14,7 +14,7 @@ def connectDB():
             host = "localhost",
             user = "postgres",
             password = "dizy1234",
-            dbname = "basdadb",
+            dbname = "basdabaru",
             port = "5432"
         )
         cur = conn.cursor()
@@ -839,7 +839,10 @@ def ajukan_peminjaman_alat(conn, cur, peminjam_id, rows):
             harga = int(alat_row[2])
             diskon = int(alat_row[3])
             # Harga adalah harga satuan/flat untuk peminjaman (tidak per-hari)
-            subtotal = harga - diskon
+            # Terapkan penambahan 10% untuk setiap minggu penuh (7 hari)
+            weeks = lama_global // 7
+            multiplier = 1 + 0.10 * weeks
+            subtotal = int((harga - diskon) * multiplier)
             selected.append({'idalat': idalat, 'nama': alat_row[1], 'harga': harga, 'diskon': diskon, 'lama': lama_global, 'subtotal': subtotal})
             print(Fore.GREEN + f"✔️ Alat '{alat_row[1]}' ditambahkan (lama {lama_global} hari).")
 
@@ -858,14 +861,30 @@ def ajukan_peminjaman_alat(conn, cur, peminjam_id, rows):
 
         # Tampilkan ringkasan
         df_sel = pd.DataFrame(selected)
-        df_sel_display = df_sel[['idalat', 'nama', 'harga', 'lama', 'subtotal']].rename(columns={
-            'idalat': 'ID', 'nama': 'Nama Alat', 'harga': 'Harga', 'lama': 'Lama(hari)', 'subtotal': 'Subtotal'
+        df_sel_display = df_sel[['idalat', 'nama', 'harga', 'diskon', 'lama', 'subtotal']].rename(columns={
+            'idalat': 'ID', 'nama': 'Nama Alat', 'harga': 'Harga Asli', 'diskon': 'Diskon', 'lama': 'Lama(hari)', 'subtotal': 'Harga Akhir'
         })
-        df_sel_display['Harga'] = df_sel_display['Harga'].apply(lambda x: f"Rp. {x}")
-        df_sel_display['Subtotal'] = df_sel_display['Subtotal'].apply(lambda x: f"Rp. {x}")
+        df_sel_display['Harga Asli'] = df_sel_display['Harga Asli'].apply(lambda x: f"Rp. {x}")
+        df_sel_display['Diskon'] = df_sel_display['Diskon'].apply(lambda x: f"Rp. {x}")
+        df_sel_display['Harga Akhir'] = df_sel_display['Harga Akhir'].apply(lambda x: f"Rp. {x}")
         print(Fore.CYAN + "\nRINGKASAN PEMINJAMAN")
         print(Fore.WHITE + tb.tabulate(df_sel_display, headers='keys', tablefmt='fancy_grid', showindex=False))
-        print(Fore.WHITE + f"Total harga: Rp. {total_harga}")
+
+        # Tampilkan penjelasan kenaikan 10% per minggu penuh (7 hari)
+        total_increase = 0
+        for item in selected:
+            weeks_item = item['lama'] // 7
+            if weeks_item > 0:
+                base = item['harga'] - item['diskon']
+                multiplier_item = 1 + 0.10 * weeks_item
+                final_item = int(base * multiplier_item)
+                increase = final_item - base
+                total_increase += increase
+                print(Fore.YELLOW + f"ℹ️ Alat '{item['nama']}' naik {10*weeks_item}% ({weeks_item} minggu penuh): +{fmt_money(increase)} sehingga Harga akhir: {fmt_money(final_item)}")
+        if total_increase > 0:
+            print(Fore.YELLOW + f"ℹ️ Total kenaikan karena minggu penuh: {fmt_money(total_increase)}")
+
+        print(Fore.WHITE + f"Total harga (setelah diskon & kenaikan mingguan): Rp. {total_harga}")
         print(Fore.WHITE + f"DP (25%): Rp. {dp}")
         print(Fore.WHITE + f"Tenggat (estimasi): {tenggat}")
 
@@ -877,8 +896,8 @@ def ajukan_peminjaman_alat(conn, cur, peminjam_id, rows):
 
         # Simpan 1 record Peminjaman
         cur.execute(
-            "INSERT INTO Peminjaman (idpeminjam, tanggalpeminjaman, tenggatpeminjaman, idstatuspeminjaman) VALUES (%s, %s, %s, %s) RETURNING idpeminjaman",
-            (peminjam_id, tanggal_pinjam, tenggat, 1)
+            "INSERT INTO Peminjaman (idpeminjam, tanggalpeminjaman, tenggatpeminjaman, idstatuspeminjaman, dp) VALUES (%s, %s, %s, %s, %s) RETURNING idpeminjaman",
+            (peminjam_id, tanggal_pinjam, tenggat, 1, dp)
         )
         idpeminjaman = cur.fetchone()[0]
 
@@ -931,7 +950,7 @@ def lihat_riwayat_peminjaman():
         SELECT 
             p.idpeminjaman,
             a.namaalat,
-            'Rp ' || dp.harga::TEXT as Harga,
+            'Rp ' || (dp.harga - COALESCE(dp.diskon, 0))::TEXT as Harga_Akhir,
             p.tanggalpeminjaman as Tgl_Pinjam,
             p.tenggatpeminjaman as Tgl_Tenggat,
             sp.statuspeminjaman as Status,
@@ -948,7 +967,7 @@ def lihat_riwayat_peminjaman():
         LEFT JOIN DetailDenda dd ON pr.idpengembalian = dd.idpengembalian
         LEFT JOIN Denda d ON dd.iddenda = d.iddenda
         WHERE p.idpeminjam = %s
-        GROUP BY p.idpeminjaman, a.namaalat, dp.harga, 
+        GROUP BY p.idpeminjaman, a.namaalat, dp.harga, dp.diskon,
                  p.tanggalpeminjaman, p.tenggatpeminjaman, sp.statuspeminjaman,
                  pr.tanggalpengembalian
         ORDER BY p.idpeminjaman DESC
@@ -963,7 +982,7 @@ def lihat_riwayat_peminjaman():
             return
         
         df = pd.DataFrame(rows, columns=[
-            'ID', 'Alat', 'Harga', 
+            'ID', 'Alat', 'Harga Akhir', 
             'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali', 'Denda Nominal'
         ])
         
@@ -1327,6 +1346,14 @@ def kelola_alat_pertanian():
                     continue
 
                 idalat = int(idalat_str)
+                
+                # Validasi klo alat milik owner ini
+                cur.execute("SELECT idalat FROM AlatPertanian WHERE idalat = %s AND idowner = %s", (idalat, owner_id_skrg))
+                if not cur.fetchone():
+                    print(Fore.RED + "❌ Alat tidak ditemukan atau bukan milik Anda.")
+                    input(Fore.WHITE + "Tekan Enter untuk kembali...")
+                    continue
+                
                 #tambahan klo alat masih dipinjem belum bisa diubah status nya
                 cur.execute("""
                     SELECT COUNT(*)
@@ -1387,6 +1414,14 @@ def kelola_alat_pertanian():
                     print(Fore.YELLOW + "\n⬅️ Dibatalkan")
                     continue
                 idalat = int(idalat_str)
+                
+                # Validasi: pastikan alat milik owner ini
+                cur.execute("SELECT idalat FROM AlatPertanian WHERE idalat = %s AND idowner = %s", (idalat, owner_id_skrg))
+                if not cur.fetchone():
+                    print(Fore.RED + "❌ Alat tidak ditemukan atau bukan milik Anda.")
+                    input(Fore.WHITE + "Tekan Enter untuk kembali...")
+                    continue
+                
                 print("\nKondisi Baru:")
                 print("1 = Baik")
                 print("2 = Rusak")
@@ -1438,6 +1473,14 @@ def kelola_alat_pertanian():
                     print(Fore.YELLOW + "\n⬅️ Dibatalkan")
                     continue
                 idalat = int(idalat_str)
+                
+                # Validasi: pastikan alat milik owner ini
+                cur.execute("SELECT idalat FROM AlatPertanian WHERE idalat = %s AND idowner = %s", (idalat, owner_id_skrg))
+                if not cur.fetchone():
+                    print(Fore.RED + "❌ Alat tidak ditemukan atau bukan milik Anda.")
+                    input(Fore.WHITE + "Tekan Enter untuk kembali...")
+                    continue
+                
                 diskon_baru_str = q.text("Masukkan diskon baru (ctrl+c untuk batal): ").ask()
                 if diskon_baru_str is None:
                     print(Fore.YELLOW + "\n⬅️ Dibatalkan")
@@ -1519,61 +1562,78 @@ def lihat_peminjaman_aktif():
 def konfirmasi_persetujuan_peminjaman():
     header()
     buat_judul(Fore.YELLOW, "KONFIRMASI PERSETUJUAN PEMINJAMAN")
+
     try:
         conn, cur = connectDB()
         if conn is None:
             print(Fore.RED + "❌ Gagal terhubung ke database")
             input()
             return
-        
+
         query = """
         SELECT
             p.idpeminjaman,
-            pm.username AS peminjam,
-            COUNT(dp.idalat) AS jumlah_alat,
-            'RP ' || SUM(dp.harga)::TEXT AS total_harga,
-            'RP ' || p.dp::TEXT AS dp,
-            p.tenggatpeminjaman
+            pm.username,
+            COUNT(dp.idalat),
+            'RP ' || (COALESCE(p.dp, 0) * 4)::TEXT,
+            'RP ' || COALESCE(p.dp, 0)::TEXT,
+            COALESCE(p.tenggatpeminjaman::TEXT, '-')
         FROM Peminjaman p
         JOIN Peminjam pm ON p.idpeminjam = pm.idpeminjam
         JOIN DetailPeminjaman dp ON p.idpeminjaman = dp.idpeminjaman
         JOIN AlatPertanian a ON dp.idalat = a.idalat
         WHERE p.idstatuspeminjaman = 1 AND a.idowner = %s
         GROUP BY p.idpeminjaman, pm.username, p.dp, p.tenggatpeminjaman
-        ORDER BY p.idpeminjaman;
+        ORDER BY p.idpeminjaman
         """
+
         cur.execute(query, (owner_id_skrg,))
         rows = cur.fetchall()
+
         if not rows:
-            print(Fore.YELLOW + "⚠️ Tidak ada peminjaman baru untuk dikonfirmasi.")
+            print(Fore.YELLOW + "⚠ Tidak ada peminjaman baru untuk dikonfirmasi.")
             input()
             return
+
+        for r in rows:
+            if len(r) != 6:
+                print(Fore.RED + "❌ Format data tidak valid.")
+                print("Data:", r)
+                input()
+                return
+
         valid_ids = {r[0] for r in rows}
+
         while True:
             header()
             buat_judul(Fore.YELLOW, "KONFIRMASI PERSETUJUAN PEMINJAMAN")
-            df = pd.DataFrame(rows, columns=['ID Pinjam', 'Peminjam', 'Jumlah Alat', 'Total Harga', 'DP', 'Tenggat'])
+
+            df = pd.DataFrame(rows, columns=[
+                'ID Pinjam', 'Peminjam', 'Jumlah Alat',
+                'Total Harga Akhir', 'DP', 'Tenggat'
+            ])
+
             print(Fore.WHITE + tb.tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
             print()
+
             id_input = q.text("Masukkan ID peminjaman (ctrl+c untuk batal): ").ask()
             if id_input is None:
-                print(Fore.YELLOW + "⬅️ Dibatalkan")
+                print(Fore.YELLOW + "Dibatalkan")
                 return
 
             id_input = id_input.strip()
             if not id_input.isdigit():
                 print(Fore.RED + "❌ ID harus angka!")
-                input("Enter...")
+                input()
                 continue
 
             idpeminjaman = int(id_input)
             if idpeminjaman not in valid_ids:
-                print(Fore.RED + "❌ ID tersebut tidak ada di daftar!")
-                input("Enter...")
+                print(Fore.RED + "❌ ID tersebut tidak ada!")
+                input()
                 continue
             break
 
-        # pilih setuju / tolak
         pilihan = q.select(
             "Setujui atau tolak peminjaman?",
             choices=["✔ Setujui", "❌ Tolak"]
@@ -1581,57 +1641,39 @@ def konfirmasi_persetujuan_peminjaman():
 
         if pilihan == "❌ Tolak":
             try:
+                cur.execute("UPDATE Peminjaman SET idstatuspeminjaman = 3 WHERE idpeminjaman = %s", (idpeminjaman,))
                 cur.execute("""
-                    UPDATE Peminjaman
-                    SET idstatuspeminjaman = 3   -- Ditolak
-                    WHERE idpeminjaman = %s
+                    UPDATE AlatPertanian SET idstatusalat = 1
+                    WHERE idalat IN (SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s)
                 """, (idpeminjaman,))
-
-                cur.execute("""
-                    UPDATE AlatPertanian
-                    SET idstatusalat = 1
-                    WHERE idalat IN (
-                        SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
-                    )
-                """, (idpeminjaman,))
-
                 conn.commit()
-                print(Fore.RED + "\n❌ Peminjaman ditolak owner.")
-                input("Enter...")
-            except Exception as e:
+                print(Fore.RED + "\n❌ Peminjaman ditolak.")
+                input()
+            except:
                 conn.rollback()
-                print(Fore.RED + f"❌ Gagal menolak peminjaman: {e}")
+                print(Fore.RED + "❌ Gagal menolak peminjaman.")
                 input()
             return
 
-        # jika setuju
         try:
+            cur.execute("UPDATE Peminjaman SET idstatuspeminjaman = 2 WHERE idpeminjaman = %s", (idpeminjaman,))
             cur.execute("""
-                UPDATE Peminjaman
-                SET idstatuspeminjaman = 2
-                WHERE idpeminjaman = %s
+                UPDATE AlatPertanian SET idstatusalat = 2
+                WHERE idalat IN (SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s)
             """, (idpeminjaman,))
-
-            cur.execute("""
-                UPDATE AlatPertanian
-                SET idstatusalat = 2
-                WHERE idalat IN (
-                    SELECT idalat FROM DetailPeminjaman WHERE idpeminjaman = %s
-                )
-            """, (idpeminjaman,))
-
             conn.commit()
             print(Fore.GREEN + "\n✅ Peminjaman disetujui!")
-            print(Fore.GREEN + "🔄 Status alat berubah menjadi 'Dipinjam'")
-            input("Enter...")
-        except Exception as e:
+            print(Fore.GREEN + "Status alat berubah menjadi 'Dipinjam'")
+            input()
+        except:
             conn.rollback()
-            print(Fore.RED + f"❌ Gagal menyetujui peminjaman: {e}")
+            print(Fore.RED + "❌ Gagal menyetujui peminjaman.")
             input()
 
     except Exception as e:
         print(Fore.RED + f"❌ Error: {e}")
         input()
+
     finally:
         if conn:
             cur.close()
@@ -1654,7 +1696,7 @@ def lihat_riwayat_peminjaman_owner():
             p.idpeminjaman,
             pm.username as Peminjam,
             a.namaalat,
-            'Rp ' || dp.harga::TEXT as Harga,
+            'Rp ' || (dp.harga - COALESCE(dp.diskon, 0))::TEXT as Harga_Akhir,
             p.tanggalpeminjaman as Tgl_Pinjam,
             p.tenggatpeminjaman as Tgl_Tenggat,
             sp.statuspeminjaman as Status,
@@ -1672,7 +1714,7 @@ def lihat_riwayat_peminjaman_owner():
         LEFT JOIN DetailDenda dd ON pr.idpengembalian = dd.idpengembalian
         LEFT JOIN Denda d ON dd.iddenda = d.iddenda
         WHERE a.idowner = %s
-        GROUP BY p.idpeminjaman, pm.username, a.namaalat, dp.harga,
+        GROUP BY p.idpeminjaman, pm.username, a.namaalat, dp.harga, dp.diskon,
                  p.tanggalpeminjaman, p.tenggatpeminjaman, sp.statuspeminjaman,
                  pr.tanggalpengembalian
         ORDER BY p.idpeminjaman DESC
@@ -1687,7 +1729,7 @@ def lihat_riwayat_peminjaman_owner():
             return
         
         df = pd.DataFrame(rows, columns=[
-            'ID', 'Peminjam', 'Alat', 'Harga',
+            'ID', 'Peminjam', 'Alat', 'Harga Akhir',
             'Tgl Pinjam', 'Tgl Tenggat', 'Status', 'Tgl Kembali', 'Denda Nominal'
         ])
         
